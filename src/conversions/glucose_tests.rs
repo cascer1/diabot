@@ -108,6 +108,32 @@ mod conversions {
 
         assert_eq!(original, converted_back);
     }
+
+    #[test]
+    fn test_display_mgdl() {
+        let glucose = Glucose::MgDl(120);
+        assert_eq!(glucose.to_string(), "120 mg/dL");
+    }
+
+    #[test]
+    fn test_display_mmol() {
+        let glucose = Glucose::Mmol(6.4);
+        assert_eq!(glucose.to_string(), "6.4 mmol/L");
+    }
+
+    #[test]
+    fn test_display_mmol_rounding() {
+        let glucose = Glucose::Mmol(5.67834);
+        // Should round to 1 decimal place
+        assert_eq!(glucose.to_string(), "5.7 mmol/L");
+    }
+
+    #[test]
+    fn test_display_mmol_trailing_zero() {
+        let glucose = Glucose::Mmol(7.0);
+        // Should include one decimal place
+        assert_eq!(glucose.to_string(), "7.0 mmol/L");
+    }
 }
 
 mod parsing {
