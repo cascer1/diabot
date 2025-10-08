@@ -1,4 +1,5 @@
 mod commands;
+mod conversions;
 
 use poise::serenity_prelude as serenity;
 use tracing::{debug, error, info};
@@ -21,6 +22,7 @@ async fn main() {
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
             commands: vec![
+                commands::convert::convert(),
                 // Add commands here
             ],
             on_error: |error| Box::pin(on_error(error)),
