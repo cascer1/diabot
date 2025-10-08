@@ -1,0 +1,11 @@
+[package]
+name = "diabot"
+description = "A diabetes chat bot for Discord"
+readme = "README.md"
+repository = "https://github.com/cascer1/diabot"
+license = "AGPL-3.0-only"
+keywords = ["diabetes", "chatbot", "discord"]
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
