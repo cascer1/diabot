@@ -233,7 +233,7 @@ mod tests {
         #[test]
         fn test_mgdl_to_mmol() {
             let mgdl = Glucose::MgDl(100);
-            let expected_mmol_val = 100.0 / MGDL_PER_MMOL; // ~5.5507
+            let expected_mmol_val = 5.5507;
 
             if let Glucose::Mmol(val) = mgdl.as_mmol() {
                 assert_approx_eq(val, expected_mmol_val);
@@ -245,7 +245,7 @@ mod tests {
         #[test]
         fn test_mmol_to_mgdl() {
             let mmol = Glucose::Mmol(5.5);
-            let expected_mgdl_val = (5.5 * MGDL_PER_MMOL).round() as i32; // ~99.085
+            let expected_mgdl_val = 99;
 
             assert_eq!(mmol.as_mgdl(), Glucose::MgDl(99));
             assert_eq!(expected_mgdl_val, 99);
