@@ -14,7 +14,6 @@ pub enum Glucose {
 impl Glucose {
     /// Returns the value converted to mg/dL.
     /// If the value is already in mg/dL, it returns a clone of itself.
-    #[allow(dead_code)]
     pub fn as_mgdl(&self) -> Glucose {
         match self {
             Glucose::MgDl(_) => *self,
@@ -24,7 +23,6 @@ impl Glucose {
 
     /// Returns the value converted to mmol/L.
     /// If the value is already in mmol/L, it returns a clone of itself.
-    #[allow(dead_code)]
     pub fn as_mmol(&self) -> Glucose {
         match self {
             Glucose::MgDl(val) => Glucose::Mmol(*val as f64 / MGDL_PER_MMOL),
@@ -33,7 +31,6 @@ impl Glucose {
     }
 
     /// Convert this [Glucose] into the opposite unit.
-    #[allow(dead_code)]
     pub fn convert(&self) -> Glucose {
         match self {
             Glucose::MgDl(_) => self.as_mmol(),
@@ -79,80 +76,105 @@ pub enum ParseGlucoseError {
     UnknownUnit(String),
 }
 
-/// Implements parsing from a string (`&str`) into a [ParsedGlucoseResult].
-///
-/// This handles:
-/// 1. Parsing the number as a float.
-/// 2. Parsing an optional, case-insensitive unit (e.g. "mg/dl", "mmol").
-/// 3. Guessing the unit if it's missing (large values = mg/dl, small values = mmol).
-impl FromStr for ParsedGlucoseResult {
-    type Err = ParseGlucoseError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let (num, unit) = parse_glucose_input(s)?;
+impl ParsedGlucoseResult {
+    /// Parses a glucose value with an optional unit.
+    ///
+    /// If both the string and the parameter specify a unit,
+    /// the parameter takes precedence.
+    pub fn parse(s: &str, unit: Option<&str>) -> Result<Self, ParseGlucoseError> {
+        let (num, parsed_unit) = parse_glucose_input(s, unit)?;
         let num_int = num.round() as i32;
 
         if num < 0.0 {
             return Err(ParseGlucoseError::NegativeNumber(s.to_string()));
         }
 
-        if unit.is_empty() {
-            if (25.0..=50.0).contains(&num) {
-                Ok(ParsedGlucoseResult::Ambiguous {
-                    original: s.to_string(),
-                    as_mmol: Glucose::Mmol(num),
-                    as_mgdl: Glucose::MgDl(num_int),
-                })
-            } else if num < 25.0 {
-                Ok(ParsedGlucoseResult::Known(Glucose::Mmol(num)))
-            } else {
-                Ok(ParsedGlucoseResult::Known(Glucose::MgDl(num_int)))
+        match parsed_unit.as_deref() {
+            None | Some("") => {
+                // Guess unit
+                if (25.0..=50.0).contains(&num) {
+                    Ok(Self::Ambiguous {
+                        original: s.trim().to_string(),
+                        as_mmol: Glucose::Mmol(num),
+                        as_mgdl: Glucose::MgDl(num_int),
+                    })
+                } else if num < 25.0 {
+                    Ok(Self::Known(Glucose::Mmol(num)))
+                } else {
+                    Ok(Self::Known(Glucose::MgDl(num_int)))
+                }
             }
-        } else {
-            match unit.as_str() {
-                "mmol" | "mmol/l" => Ok(ParsedGlucoseResult::Known(Glucose::Mmol(num))),
-                "mg" | "mg/dl" | "mgdl" => Ok(ParsedGlucoseResult::Known(Glucose::MgDl(num_int))),
-                _ => Err(ParseGlucoseError::UnknownUnit(unit)),
+
+            Some(unit) => {
+                // Unit provided
+                match unit.to_lowercase().as_str() {
+                    "mmol" | "mmol/l" => Ok(Self::Known(Glucose::Mmol(num))),
+                    "mg" | "mg/dl" | "mgdl" => Ok(Self::Known(Glucose::MgDl(num_int))),
+                    _ => Err(ParseGlucoseError::UnknownUnit(unit.to_string())),
+                }
             }
         }
     }
 }
 
-/// Parses a blood glucose value from a string into a (number, unit) tuple.
-/// Supports both "5.5 mmol" and "5.5mmol" styles.
-pub fn parse_glucose_input(s: &str) -> Result<(f64, String), ParseGlucoseError> {
-    let s = s.trim();
-    if s.is_empty() {
+impl FromStr for ParsedGlucoseResult {
+    type Err = ParseGlucoseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::parse(s, None)
+    }
+}
+
+/// Parses a blood glucose value and its unit from string input, returning a `(number, unit)` tuple.
+///
+/// The unit string in the result is always lowercased.
+/// This function only extracts the unit; it does not verify that it's valid.
+/// For validation, use [`ParsedGlucoseResult::parse_with_unit`].
+///
+/// If both the value string and the `unit` parameter specify a unit,
+/// the `unit` parameter takes precedence.
+///
+/// The following input styles are supported:
+/// - `"5.5 mmol"` - space-delimited
+/// - `"5.5mmol"` - compact
+/// - `"5,5 mmol"` - comma as decimal separator
+/// - `("5.5", Some("mmol"))` - unit parameter
+/// - `("5.5", None)` - no unit provided
+pub fn parse_glucose_input(
+    value: &str,
+    unit: Option<&str>,
+) -> Result<(f64, Option<String>), ParseGlucoseError> {
+    // Normalize commas (`5,5` -> `5.5`)
+    let value = value.trim().replace(',', ".");
+    if value.is_empty() {
         return Err(ParseGlucoseError::EmptyInput);
     }
 
-    // Splitting by whitespace
-    let mut parts = s.split_whitespace();
-    let first = parts.next().ok_or(ParseGlucoseError::EmptyInput)?;
-    let second = parts.next();
-
-    // Case 1: "5.5 mmol", space delimited number and unit
-    if let Some(unit) = second {
-        let num: f64 = first
-            .parse()
-            .map_err(|_| ParseGlucoseError::InvalidNumber(first.to_string()))?;
-        return Ok((num, unit.trim().to_lowercase()));
-    }
-
-    // Case 2: "5.5mmol", we need to split the number and unit manually
-    let split_pos = s
+    // Try to find where the number ends and the unit (if any) begins
+    let split_pos = value
         .char_indices()
-        .find(|(_, c)| !c.is_ascii_digit() && *c != '.')
+        .find(|(_, c)| !c.is_ascii_digit() && *c != '.' && *c != '-')
         .map(|(i, _)| i)
-        .unwrap_or(s.len());
-
+        .unwrap_or(value.len());
     if split_pos == 0 {
-        return Err(ParseGlucoseError::InvalidNumber(s.to_string()));
+        return Err(ParseGlucoseError::InvalidNumber(value));
     }
+    let (num_part, unit_part) = value.split_at(split_pos);
+    // Trim both parts
+    let num_part = num_part.trim();
+    let unit_part = unit_part.trim();
 
-    let (num_str, unit) = s.split_at(split_pos);
-    let num: f64 = num_str
+    // Parse number
+    let num: f64 = num_part
         .parse()
-        .map_err(|_| ParseGlucoseError::InvalidNumber(num_str.to_string()))?;
-    Ok((num, unit.trim().to_lowercase()))
+        .map_err(|_| ParseGlucoseError::InvalidNumber(num_part.to_string()))?;
+
+    // Determine unit
+    let final_unit = match unit {
+        Some(u) => Some(u.trim().to_lowercase()), // unit parameter
+        None if !unit_part.is_empty() => Some(unit_part.to_lowercase()), // unit from value string
+        _ => None,
+    };
+
+    Ok((num, final_unit))
 }
