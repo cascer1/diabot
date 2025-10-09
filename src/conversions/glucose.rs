@@ -69,9 +69,6 @@ pub enum ParseGlucoseError {
     #[error("Invalid number format: '{0}'")]
     InvalidNumber(String),
 
-    #[error("Negative not allowed: '{0}'")]
-    NegativeNumber(String),
-
     #[error("Unknown unit specified: '{0}'")]
     UnknownUnit(String),
 }
@@ -84,10 +81,6 @@ impl ParsedGlucoseResult {
     pub fn parse(s: &str, unit: Option<&str>) -> Result<Self, ParseGlucoseError> {
         let (num, parsed_unit) = parse_glucose_input(s, unit)?;
         let num_int = num.round() as i32;
-
-        if num < 0.0 {
-            return Err(ParseGlucoseError::NegativeNumber(s.to_string()));
-        }
 
         match parsed_unit.as_deref() {
             None | Some("") => {
@@ -377,12 +370,9 @@ mod tests {
 
         #[test]
         fn parse_negative_and_zero_inputs() {
-            // Zero is allowed
             assert_known_parsed("0 mmol", Glucose::Mmol(0.0));
-
-            // Negative values should return an error
-            let err = ParsedGlucoseResult::from_str("-5 mg/dl").unwrap_err();
-            assert_eq!(err, ParseGlucoseError::NegativeNumber("-5 mg/dl".into()));
+            assert_known_parsed("-5 mg/dl", Glucose::MgDl(-5));
+            assert_known_parsed("-5.5 mmol", Glucose::Mmol(-5.5));
         }
 
         #[test]
