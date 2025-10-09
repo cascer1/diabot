@@ -3,6 +3,8 @@ use std::str::FromStr;
 use thiserror::Error;
 
 const MGDL_PER_MMOL: f32 = 18.015588;
+const MIN_BG_VALUE: f32 = -9999.0;
+const MAX_BG_VALUE: f32 = 9999.0;
 
 /// A glucose value and its unit of measurement.
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -69,6 +71,9 @@ pub enum ParseGlucoseError {
     #[error("Invalid number format: '{0}'")]
     InvalidNumber(String),
 
+    #[error("Number is out of range: {0} (between {min} and {max})", min = MIN_BG_VALUE, max = MAX_BG_VALUE)]
+    OutOfRange(String),
+
     #[error("Unknown unit specified: '{0}'")]
     UnknownUnit(String),
 }
@@ -80,6 +85,9 @@ impl ParsedGlucoseResult {
     /// the parameter takes precedence.
     pub fn parse(s: &str, unit: Option<&str>) -> Result<Self, ParseGlucoseError> {
         let (num, parsed_unit) = parse_glucose_input(s, unit)?;
+        if num < MIN_BG_VALUE || num > MAX_BG_VALUE {
+            return Err(ParseGlucoseError::OutOfRange(s.to_string()));
+        }
         let num_int = num.round() as i32;
 
         match parsed_unit.as_deref() {
@@ -378,6 +386,13 @@ mod tests {
         #[test]
         fn parse_large_value_input() {
             assert_known_parsed("9999 mgdl", Glucose::MgDl(9999));
+            assert_known_parsed("-9999 mmol", Glucose::Mmol(-9999.0));
+
+            let err = ParsedGlucoseResult::from_str("10000 mgdl").unwrap_err();
+            assert_eq!(err, ParseGlucoseError::OutOfRange("10000 mgdl".into()));
+
+            let err = ParsedGlucoseResult::from_str("-10000 mmol").unwrap_err();
+            assert_eq!(err, ParseGlucoseError::OutOfRange("-10000 mmol".into()));
         }
 
         #[test]
