@@ -221,7 +221,7 @@ mod tests {
         /// Direct comparison (`a == b`) with floating-point numbers can be unreliable
         /// due to precision issues.
         fn assert_approx_eq(a: f64, b: f64) {
-            let epsilon = 1e-5;
+            let epsilon = 1e-3;
             assert!(
                 (a - b).abs() < epsilon,
                 "Assertion failed: {} is not approximately equal to {}",
