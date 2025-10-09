@@ -213,7 +213,8 @@ mod parsing {
         let err = ParsedGlucoseResult::from_str("5.5 mmoll").unwrap_err();
         assert_eq!(err, ParseGlucoseError::UnknownUnit("mmoll".into()));
 
-        assert_known_parsed("5.5 mmol / L", Glucose::Mmol(5.5));
+        let err = ParsedGlucoseResult::from_str("5.5 mmol / L ").unwrap_err();
+        assert_eq!(err, ParseGlucoseError::UnknownUnit("mmol / l".into()));
     }
 }
 
@@ -221,47 +222,51 @@ mod parse_glucose_str_input {
     use super::*;
 
     #[test]
-    fn test_parse_glucose_input_basic() {
-        assert_eq!(
-            parse_glucose_input("5.5 mmol").unwrap(),
-            (5.5, "mmol".to_string())
-        );
-        assert_eq!(
-            parse_glucose_input("5.5mmol/l").unwrap(),
-            (5.5, "mmol/l".to_string())
-        );
-        assert_eq!(
-            parse_glucose_input("180mg/dl").unwrap(),
-            (180.0, "mg/dl".to_string())
-        );
-        assert_eq!(
-            parse_glucose_input("180 mg/dl").unwrap(),
-            (180.0, "mg/dl".to_string())
-        );
-        assert_eq!(
-            parse_glucose_input("180mgdl").unwrap(),
-            (180.0, "mgdl".to_string())
-        );
-        assert_eq!(parse_glucose_input("4.2").unwrap(), (4.2, "".to_string()));
+    fn test_parse_glucose_input() {
+        let cases = [
+            ("5.5 mmol", (5.5, Some("mmol"))),
+            ("5.5mmol/l", (5.5, Some("mmol/l"))),
+            ("5.5mmol/L", (5.5, Some("mmol/l"))),
+            ("5.5 mmol/L", (5.5, Some("mmol/l"))),
+            ("180mg/dl", (180.0, Some("mg/dl"))),
+            ("180 mg/dl", (180.0, Some("mg/dl"))),
+            ("180mgdl", (180.0, Some("mgdl"))),
+            ("180 mg", (180.0, Some("mg"))),
+            ("180 MG/DL", (180.0, Some("mg/dl"))),
+            ("180 randomunit", (180.0, Some("randomunit"))),
+            ("180 Random Unit", (180.0, Some("random unit"))),
+            ("5.5", (5.5, None)),
+            ("180", (180.0, None)),
+        ];
+
+        for (input, expected) in cases {
+            let parsed = parse_glucose_input(input, None).unwrap();
+            assert_eq!(
+                parsed,
+                (expected.0, expected.1.map(|s| s.to_string())),
+                "Failed on input: {}",
+                input
+            );
+        }
     }
 
     #[test]
     fn test_parse_with_extra_spaces() {
         assert_eq!(
-            parse_glucose_input("  7.1   mmol/L ").unwrap(),
-            (7.1, "mmol/l".to_string())
+            parse_glucose_input("  7.1   mmol/L ", None).unwrap(),
+            (7.1, Some("mmol/l".to_string()))
         );
     }
 
     #[test]
     fn test_parse_invalid_number() {
         assert_eq!(
-            parse_glucose_input("abc mg/dl").unwrap_err(),
-            ParseGlucoseError::InvalidNumber("abc".into())
+            parse_glucose_input("abc mg/dl", None).unwrap_err(),
+            ParseGlucoseError::InvalidNumber("abc mg/dl".into())
         );
 
         assert_eq!(
-            parse_glucose_input("abc").unwrap_err(),
+            parse_glucose_input("abc", None).unwrap_err(),
             ParseGlucoseError::InvalidNumber("abc".into())
         );
     }
@@ -269,7 +274,7 @@ mod parse_glucose_str_input {
     #[test]
     fn test_parse_empty_input() {
         assert_eq!(
-            parse_glucose_input("").unwrap_err(),
+            parse_glucose_input("", None).unwrap_err(),
             ParseGlucoseError::EmptyInput
         );
     }
