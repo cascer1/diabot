@@ -2,13 +2,13 @@ use std::fmt;
 use std::str::FromStr;
 use thiserror::Error;
 
-const MGDL_PER_MMOL: f64 = 18.015588;
+const MGDL_PER_MMOL: f32 = 18.015588;
 
 /// A glucose value and its unit of measurement.
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Glucose {
     MgDl(i32),
-    Mmol(f64),
+    Mmol(f32),
 }
 
 impl Glucose {
@@ -25,7 +25,7 @@ impl Glucose {
     /// If the value is already in mmol/L, it returns a clone of itself.
     pub fn as_mmol(&self) -> Glucose {
         match self {
-            Glucose::MgDl(val) => Glucose::Mmol(*val as f64 / MGDL_PER_MMOL),
+            Glucose::MgDl(val) => Glucose::Mmol(*val as f32 / MGDL_PER_MMOL),
             Glucose::Mmol(_) => *self,
         }
     }
@@ -143,7 +143,7 @@ impl FromStr for ParsedGlucoseResult {
 pub fn parse_glucose_input(
     value: &str,
     unit: Option<&str>,
-) -> Result<(f64, Option<String>), ParseGlucoseError> {
+) -> Result<(f32, Option<String>), ParseGlucoseError> {
     // Normalize commas (`5,5` -> `5.5`)
     let value = value.trim().replace(',', ".");
     if value.is_empty() {
@@ -165,7 +165,7 @@ pub fn parse_glucose_input(
     let unit_part = unit_part.trim();
 
     // Parse number
-    let num: f64 = num_part
+    let num: f32 = num_part
         .parse()
         .map_err(|_| ParseGlucoseError::InvalidNumber(num_part.to_string()))?;
 
@@ -220,7 +220,7 @@ mod tests {
         /// A helper function for comparing floats with a small tolerance.
         /// Direct comparison (`a == b`) with floating-point numbers can be unreliable
         /// due to precision issues.
-        fn assert_approx_eq(a: f64, b: f64) {
+        fn assert_approx_eq(a: f32, b: f32) {
             let epsilon = 1e-3;
             assert!(
                 (a - b).abs() < epsilon,
