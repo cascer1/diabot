@@ -2,7 +2,7 @@ use std::fmt;
 use std::str::FromStr;
 use thiserror::Error;
 
-pub const MGDL_PER_MMOL: f64 = 18.015588;
+const MGDL_PER_MMOL: f64 = 18.015588;
 
 /// A glucose value and its unit of measurement.
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -177,4 +177,288 @@ pub fn parse_glucose_input(
     };
 
     Ok((num, final_unit))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn assert_known_parsed(input: &str, expected: Glucose) {
+        let parsed = ParsedGlucoseResult::from_str(input).unwrap();
+        match parsed {
+            ParsedGlucoseResult::Known(bs) => {
+                assert_eq!(bs, expected);
+            }
+            _ => panic!("Expected Known variant for input: {}", input),
+        }
+    }
+
+    fn assert_ambiguous_parsed(
+        input: &str,
+        expected_original: &str,
+        expected_mmol: Glucose,
+        expected_mgdl: Glucose,
+    ) {
+        let parsed = ParsedGlucoseResult::from_str(input).unwrap();
+        match parsed {
+            ParsedGlucoseResult::Ambiguous {
+                original,
+                as_mmol,
+                as_mgdl,
+            } => {
+                assert_eq!(original, expected_original);
+                assert_eq!(as_mmol, expected_mmol);
+                assert_eq!(as_mgdl, expected_mgdl);
+            }
+            _ => panic!("Expected Ambiguous variant for input: {}", input),
+        }
+    }
+
+    mod conversions {
+        use super::*;
+
+        /// A helper function for comparing floats with a small tolerance.
+        /// Direct comparison (`a == b`) with floating-point numbers can be unreliable
+        /// due to precision issues.
+        fn assert_approx_eq(a: f64, b: f64) {
+            let epsilon = 1e-5;
+            assert!(
+                (a - b).abs() < epsilon,
+                "Assertion failed: {} is not approximately equal to {}",
+                a,
+                b,
+            );
+        }
+
+        #[test]
+        fn test_mgdl_to_mmol() {
+            let mgdl = Glucose::MgDl(100);
+            let expected_mmol_val = 100.0 / MGDL_PER_MMOL; // ~5.5507
+
+            if let Glucose::Mmol(val) = mgdl.as_mmol() {
+                assert_approx_eq(val, expected_mmol_val);
+            } else {
+                panic!("Expected Glucose::Mmol");
+            }
+        }
+
+        #[test]
+        fn test_mmol_to_mgdl() {
+            let mmol = Glucose::Mmol(5.5);
+            let expected_mgdl_val = (5.5 * MGDL_PER_MMOL).round() as i32; // ~99.085
+
+            assert_eq!(mmol.as_mgdl(), Glucose::MgDl(99));
+            assert_eq!(expected_mgdl_val, 99);
+        }
+
+        #[test]
+        fn test_rounding_mmol_to_mgdl() {
+            // This value (100 / 18.015588) is ~5.5507, which should round up to 100 mg/dL
+            let mmol = Glucose::Mmol(5.5507);
+            assert_eq!(mmol.as_mgdl(), Glucose::MgDl(100));
+        }
+
+        #[test]
+        fn test_idempotent_conversions() {
+            // Calling a conversion on a value that is already in the target unit
+            // should not change it.
+            let mgdl = Glucose::MgDl(120);
+            assert_eq!(mgdl.as_mgdl(), mgdl);
+
+            let mmol = Glucose::Mmol(6.7);
+            assert_eq!(mmol.as_mmol(), mmol);
+        }
+
+        #[test]
+        fn test_general_convert_toggle() {
+            let mgdl = Glucose::MgDl(150);
+            let mmol = Glucose::Mmol(8.3);
+
+            // Converting from mg/dL should yield mmol/L
+            assert!(matches!(mgdl.convert(), Glucose::Mmol(_)));
+
+            // Converting from mmol/L should yield mg/dL
+            assert!(matches!(mmol.convert(), Glucose::MgDl(_)));
+        }
+
+        #[test]
+        fn test_double_conversion_mgdl() {
+            // Test if converting back and forth results in the original value.
+            // Due to rounding, it should be very close but might not be exact.
+            let original = Glucose::MgDl(125);
+            let converted_back = original.convert().convert(); // MgDl -> Mmol -> MgDl
+
+            assert_eq!(original, converted_back);
+        }
+
+        #[test]
+        fn test_display_mgdl() {
+            let glucose = Glucose::MgDl(120);
+            assert_eq!(glucose.to_string(), "120 mg/dL");
+        }
+
+        #[test]
+        fn test_display_mmol() {
+            let glucose = Glucose::Mmol(6.4);
+            assert_eq!(glucose.to_string(), "6.4 mmol/L");
+        }
+
+        #[test]
+        fn test_display_mmol_rounding() {
+            let glucose = Glucose::Mmol(5.67834);
+            // Should round to 1 decimal place
+            assert_eq!(glucose.to_string(), "5.7 mmol/L");
+        }
+
+        #[test]
+        fn test_display_mmol_trailing_zero() {
+            let glucose = Glucose::Mmol(7.0);
+            // Should include one decimal place
+            assert_eq!(glucose.to_string(), "7.0 mmol/L");
+        }
+    }
+
+    mod parsing {
+        use super::*;
+
+        #[test]
+        fn parse_known_mmol() {
+            assert_known_parsed("5.2 mmol", Glucose::Mmol(5.2));
+        }
+
+        #[test]
+        fn parse_known_mgdl() {
+            assert_known_parsed("100 mg/dl", Glucose::MgDl(100));
+        }
+
+        #[test]
+        fn parse_unambiguous_mmol_no_unit() {
+            assert_known_parsed("4.8", Glucose::Mmol(4.8));
+        }
+
+        #[test]
+        fn parse_unambiguous_mgdl_no_unit() {
+            assert_known_parsed("180", Glucose::MgDl(180));
+        }
+
+        #[test]
+        fn parse_ambiguous_no_unit() {
+            assert_ambiguous_parsed("35", "35", Glucose::Mmol(35.0), Glucose::MgDl(35));
+        }
+
+        #[test]
+        fn parse_unknown_unit() {
+            let err = ParsedGlucoseResult::from_str("5.5 tests").unwrap_err();
+            assert_eq!(err, ParseGlucoseError::UnknownUnit("tests".into()));
+        }
+
+        #[test]
+        fn test_case_insensitive_and_alias_units() {
+            let test_cases = [
+                ("6.3 MMOL/L", Glucose::Mmol(6.3)),
+                ("6.3 mmol", Glucose::Mmol(6.3)),
+                ("6.3MMOL", Glucose::Mmol(6.3)),
+                ("115 MG/dl", Glucose::MgDl(115)),
+                ("115 mgdl", Glucose::MgDl(115)),
+                ("115 mg", Glucose::MgDl(115)),
+                ("115mgdl", Glucose::MgDl(115)),
+            ];
+
+            for (input, expected) in test_cases {
+                let parsed = ParsedGlucoseResult::from_str(input).unwrap();
+                match parsed {
+                    ParsedGlucoseResult::Known(bs) => {
+                        assert_eq!(bs, expected, "Failed on input: {}", input);
+                    }
+                    _ => panic!("Expected Known variant for input: {}", input),
+                }
+            }
+        }
+
+        #[test]
+        fn parse_negative_and_zero_inputs() {
+            // Zero is allowed
+            assert_known_parsed("0 mmol", Glucose::Mmol(0.0));
+
+            // Negative values should return an error
+            let err = ParsedGlucoseResult::from_str("-5 mg/dl").unwrap_err();
+            assert_eq!(err, ParseGlucoseError::NegativeNumber("-5 mg/dl".into()));
+        }
+
+        #[test]
+        fn parse_large_value_input() {
+            assert_known_parsed("9999 mgdl", Glucose::MgDl(9999));
+        }
+
+        #[test]
+        fn parse_input_with_typos_or_spacing_errors() {
+            let err = ParsedGlucoseResult::from_str("5.5 mmoll").unwrap_err();
+            assert_eq!(err, ParseGlucoseError::UnknownUnit("mmoll".into()));
+
+            let err = ParsedGlucoseResult::from_str("5.5 mmol / L ").unwrap_err();
+            assert_eq!(err, ParseGlucoseError::UnknownUnit("mmol / l".into()));
+        }
+    }
+
+    mod parse_glucose_str_input {
+        use super::*;
+
+        #[test]
+        fn test_parse_glucose_input() {
+            let cases = [
+                ("5.5 mmol", (5.5, Some("mmol"))),
+                ("5.5mmol/l", (5.5, Some("mmol/l"))),
+                ("5.5mmol/L", (5.5, Some("mmol/l"))),
+                ("5.5 mmol/L", (5.5, Some("mmol/l"))),
+                ("180mg/dl", (180.0, Some("mg/dl"))),
+                ("180 mg/dl", (180.0, Some("mg/dl"))),
+                ("180mgdl", (180.0, Some("mgdl"))),
+                ("180 mg", (180.0, Some("mg"))),
+                ("180 MG/DL", (180.0, Some("mg/dl"))),
+                ("180 randomunit", (180.0, Some("randomunit"))),
+                ("180 Random Unit", (180.0, Some("random unit"))),
+                ("5.5", (5.5, None)),
+                ("180", (180.0, None)),
+            ];
+
+            for (input, expected) in cases {
+                let parsed = parse_glucose_input(input, None).unwrap();
+                assert_eq!(
+                    parsed,
+                    (expected.0, expected.1.map(|s| s.to_string())),
+                    "Failed on input: {}",
+                    input
+                );
+            }
+        }
+
+        #[test]
+        fn test_parse_with_extra_spaces() {
+            assert_eq!(
+                parse_glucose_input("  7.1   mmol/L ", None).unwrap(),
+                (7.1, Some("mmol/l".to_string()))
+            );
+        }
+
+        #[test]
+        fn test_parse_invalid_number() {
+            assert_eq!(
+                parse_glucose_input("abc mg/dl", None).unwrap_err(),
+                ParseGlucoseError::InvalidNumber("abc mg/dl".into())
+            );
+
+            assert_eq!(
+                parse_glucose_input("abc", None).unwrap_err(),
+                ParseGlucoseError::InvalidNumber("abc".into())
+            );
+        }
+
+        #[test]
+        fn test_parse_empty_input() {
+            assert_eq!(
+                parse_glucose_input("", None).unwrap_err(),
+                ParseGlucoseError::EmptyInput
+            );
+        }
+    }
 }
