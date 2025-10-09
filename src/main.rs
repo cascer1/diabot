@@ -1,5 +1,6 @@
 mod commands;
 mod conversions;
+mod util;
 
 use poise::serenity_prelude as serenity;
 use tracing::{debug, error, info};

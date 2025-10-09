@@ -1,6 +1,7 @@
 use crate::conversions::glucose::ParsedGlucoseResult;
 use crate::serenity::CreateEmbed;
 use crate::{Context, Error};
+use crate::util::colors::{ERROR, INFO, WARNING};
 
 /// Converts blood glucose units (mg/dL <> mmol/L).
 #[poise::command(
@@ -14,7 +15,7 @@ pub async fn convert(
     let reply = match glucose.parse::<ParsedGlucoseResult>() {
         Ok(glucose_value) => match glucose_value {
             ParsedGlucoseResult::Known(bg) => {
-                let embed = CreateEmbed::default().color(0x3498DB).description(format!(
+                let embed = CreateEmbed::default().color(INFO).description(format!(
                     "{} is {}",
                     bg,
                     bg.convert()
@@ -38,7 +39,7 @@ pub async fn convert(
                 );
 
                 let embed = CreateEmbed::default()
-                    .color(0xF1C40F)
+                    .color(WARNING)
                     .description(description);
                 poise::CreateReply::default().embed(embed)
             }
@@ -50,7 +51,7 @@ pub async fn convert(
                     "I couldn't understand your input.\n\n**Reason:** {e}\n\n\
                     Please make sure you're entering a number optionally followed by a unit."
                 ))
-                .color(0xE74C3C)
+                .color(ERROR)
                 .field(
                     "Examples of valid input",
                     "`/convert 5.7mmol`\n`/convert 100 mgdl`\n`/convert 30`",
