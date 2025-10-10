@@ -15,7 +15,7 @@ pub enum Glucose {
 
 impl Glucose {
     /// Converts the value to mg/dL.
-    /// If the value is already in mg/dL, it returns a clone of itself.
+    /// If the value is already in mg/dL, it returns itself.
     pub fn to_mgdl(self) -> Glucose {
         match self {
             Glucose::MgDl(_) => self,
@@ -24,7 +24,7 @@ impl Glucose {
     }
 
     /// Converts the value to mmol/L.
-    /// If the value is already in mmol/L, it returns a clone of itself.
+    /// If the value is already in mmol/L, it returns itself.
     pub fn to_mmol(self) -> Glucose {
         match self {
             Glucose::MgDl(val) => Glucose::Mmol(val as f32 / MGDL_PER_MMOL),
