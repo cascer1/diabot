@@ -16,19 +16,19 @@ pub enum Glucose {
 impl Glucose {
     /// Converts the value to mg/dL.
     /// If the value is already in mg/dL, it returns a clone of itself.
-    pub fn to_mgdl(&self) -> Glucose {
+    pub fn to_mgdl(self) -> Glucose {
         match self {
-            Glucose::MgDl(_) => *self,
+            Glucose::MgDl(_) => self,
             Glucose::Mmol(val) => Glucose::MgDl((val * MGDL_PER_MMOL).round() as i32),
         }
     }
 
     /// Converts the value to mmol/L.
     /// If the value is already in mmol/L, it returns a clone of itself.
-    pub fn to_mmol(&self) -> Glucose {
+    pub fn to_mmol(self) -> Glucose {
         match self {
-            Glucose::MgDl(val) => Glucose::Mmol(*val as f32 / MGDL_PER_MMOL),
-            Glucose::Mmol(_) => *self,
+            Glucose::MgDl(val) => Glucose::Mmol(val as f32 / MGDL_PER_MMOL),
+            Glucose::Mmol(_) => self,
         }
     }
 
@@ -85,7 +85,7 @@ impl ParsedGlucoseResult {
     /// the parameter takes precedence.
     pub fn parse(s: &str, unit: Option<&str>) -> Result<Self, ParseGlucoseError> {
         let (num, parsed_unit) = parse_glucose_input(s, unit)?;
-        if num < MIN_BG_VALUE || num > MAX_BG_VALUE {
+        if !(MIN_BG_VALUE..=MAX_BG_VALUE).contains(&num) {
             return Err(ParseGlucoseError::OutOfRange(s.to_string()));
         }
         let num_int = num.round() as i32;
