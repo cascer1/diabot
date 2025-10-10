@@ -14,18 +14,18 @@ pub enum Glucose {
 }
 
 impl Glucose {
-    /// Returns the value converted to mg/dL.
+    /// Converts the value to mg/dL.
     /// If the value is already in mg/dL, it returns a clone of itself.
-    pub fn as_mgdl(&self) -> Glucose {
+    pub fn to_mgdl(&self) -> Glucose {
         match self {
             Glucose::MgDl(_) => *self,
             Glucose::Mmol(val) => Glucose::MgDl((val * MGDL_PER_MMOL).round() as i32),
         }
     }
 
-    /// Returns the value converted to mmol/L.
+    /// Converts the value to mmol/L.
     /// If the value is already in mmol/L, it returns a clone of itself.
-    pub fn as_mmol(&self) -> Glucose {
+    pub fn to_mmol(&self) -> Glucose {
         match self {
             Glucose::MgDl(val) => Glucose::Mmol(*val as f32 / MGDL_PER_MMOL),
             Glucose::Mmol(_) => *self,
@@ -35,8 +35,8 @@ impl Glucose {
     /// Convert this [Glucose] into the opposite unit.
     pub fn convert(&self) -> Glucose {
         match self {
-            Glucose::MgDl(_) => self.as_mmol(),
-            Glucose::Mmol(_) => self.as_mgdl(),
+            Glucose::MgDl(_) => self.to_mmol(),
+            Glucose::Mmol(_) => self.to_mgdl(),
         }
     }
 }
@@ -160,6 +160,7 @@ pub fn parse_glucose_input(
     if split_pos == 0 {
         return Err(ParseGlucoseError::InvalidNumber(value));
     }
+
     let (num_part, unit_part) = value.split_at(split_pos);
     // Trim both parts
     let num_part = num_part.trim();
@@ -236,7 +237,7 @@ mod tests {
             let mgdl = Glucose::MgDl(100);
             let expected_mmol_val = 5.5507;
 
-            if let Glucose::Mmol(val) = mgdl.as_mmol() {
+            if let Glucose::Mmol(val) = mgdl.to_mmol() {
                 assert_approx_eq(val, expected_mmol_val);
             } else {
                 panic!("Expected Glucose::Mmol");
@@ -248,7 +249,7 @@ mod tests {
             let mmol = Glucose::Mmol(5.5);
             let expected_mgdl_val = 99;
 
-            assert_eq!(mmol.as_mgdl(), Glucose::MgDl(99));
+            assert_eq!(mmol.to_mgdl(), Glucose::MgDl(99));
             assert_eq!(expected_mgdl_val, 99);
         }
 
@@ -256,7 +257,7 @@ mod tests {
         fn test_rounding_mmol_to_mgdl() {
             // This value (100 / 18.015588) is ~5.5507, which should round up to 100 mg/dL
             let mmol = Glucose::Mmol(5.5507);
-            assert_eq!(mmol.as_mgdl(), Glucose::MgDl(100));
+            assert_eq!(mmol.to_mgdl(), Glucose::MgDl(100));
         }
 
         #[test]
@@ -264,10 +265,10 @@ mod tests {
             // Calling a conversion on a value that is already in the target unit
             // should not change it.
             let mgdl = Glucose::MgDl(120);
-            assert_eq!(mgdl.as_mgdl(), mgdl);
+            assert_eq!(mgdl.to_mgdl(), mgdl);
 
             let mmol = Glucose::Mmol(6.7);
-            assert_eq!(mmol.as_mmol(), mmol);
+            assert_eq!(mmol.to_mmol(), mmol);
         }
 
         #[test]
