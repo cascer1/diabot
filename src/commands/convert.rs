@@ -1,16 +1,8 @@
-use crate::conversions::glucose::ParsedGlucoseResult;
+use crate::conversions::glucose::{GlucoseUnit, ParsedGlucoseResult};
 use crate::serenity::CreateEmbed;
 use crate::util::colors::{ERROR, INFO, WARNING};
 use crate::{Context, Error};
 use poise::ChoiceParameter;
-
-#[derive(Debug, poise::ChoiceParameter)]
-pub enum GlucoseUnit {
-    #[name = "mg/dL"]
-    Mgdl,
-    #[name = "mmol/L"]
-    Mmol,
-}
 
 /// Converts blood glucose units (mg/dL <> mmol/L).
 #[poise::command(
