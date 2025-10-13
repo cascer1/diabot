@@ -93,11 +93,11 @@ fn set_response_color(ns_data: &CombinedNightscout, mut embed: CreateEmbed) -> C
     let bg_low = settings.bg_low;
 
     if glucose >= bg_high || glucose <= bg_low {
-        embed = embed.color(0xFF0000);
+        embed = embed.color(Color::from_rgb(255, 0, 0));
     } else if glucose >= bg_target_top && glucose < bg_high || glucose > bg_low && glucose <= bg_target_bottom {
         embed = embed.color(Color::from_rgb(255, 200, 0));
     } else {
-        embed = embed.color(0x00FF00);
+        embed = embed.color(Color::from_rgb(0, 255, 0));
     }
 
     embed
