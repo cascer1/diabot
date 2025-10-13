@@ -3,6 +3,7 @@ use std::fmt;
 use std::str::FromStr;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use crate::util::deserializers::deserialize_glucose;
 use crate::util::math::round_to;
 
 const MGDL_PER_MMOL: f32 = 18.015588;
@@ -122,6 +123,15 @@ impl Ord for Glucose {
 impl PartialOrd for Glucose {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
+    }
+}
+
+impl<'de> Deserialize<'de> for Glucose {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserialize_glucose(deserializer)
     }
 }
 

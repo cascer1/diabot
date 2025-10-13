@@ -1,15 +1,12 @@
 #![allow(dead_code)]
 
-use crate::util::deserializers::deserialize_glucose;
-use serde::{Deserialize};
 use crate::conversions::glucose::Glucose;
 use crate::util::nightscout::types::TrendArrow;
+use serde::Deserialize;
 
 #[derive(Deserialize, Debug)]
 pub struct BgNowPlugin {
-    #[serde(deserialize_with = "deserialize_glucose")]
     pub mean: Glucose,
-    #[serde(deserialize_with = "deserialize_glucose")]
     pub last: Glucose,
     pub mills: i64,
     pub sgvs: Vec<Sgv>,
@@ -19,9 +16,7 @@ pub struct BgNowPlugin {
 pub struct Sgv {
     #[serde(rename = "_id")]
     pub id: String,
-    #[serde(deserialize_with = "deserialize_glucose")]
     pub mgdl: Glucose,
-    #[serde(deserialize_with = "deserialize_glucose")]
     /// Scaled glucose value based on Nightscout unit setting
     pub scaled: Glucose,
     pub mills: i64,
@@ -33,20 +28,16 @@ pub struct Sgv {
 
 #[derive(Deserialize, Debug)]
 pub struct DeltaPlugin {
-    #[serde(deserialize_with = "deserialize_glucose")]
     pub absolute: Glucose,
     #[serde(rename = "elapsedMins")]
     pub elapsed_mins: f64,
     pub interpolated: bool,
-    #[serde(deserialize_with = "deserialize_glucose")]
     #[serde(rename = "mean5MinsAgo")]
     /// Mean glucose value for the last 5 minutes. Should be in mg/dL.
     pub mean_5m_ago: Glucose,
     pub times: DeltaTimes,
-    #[serde(deserialize_with = "deserialize_glucose")]
     /// Glucose value in mg/dL
     pub mgdl: Glucose,
-    #[serde(deserialize_with = "deserialize_glucose")]
     /// Scaled glucose value based on the Nightscout unit setting.
     pub scaled: Glucose,
     /// Display version of `scaled`. The unit is based on Nightscout settings.
@@ -62,9 +53,7 @@ pub struct DeltaTimes {
 
 #[derive(Deserialize, Debug)]
 pub struct DeltaPrevious {
-    #[serde(deserialize_with = "deserialize_glucose")]
     pub mean: Glucose,
-    #[serde(deserialize_with = "deserialize_glucose")]
     pub last: Glucose,
     pub mills: i64,
     pub sgvs: Vec<Sgv>,
