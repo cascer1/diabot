@@ -56,17 +56,18 @@ pub struct Status {
     #[query(".settings.units")]
     pub units: GlucoseUnit,
 
+    // these should be in mg/dL
     #[query(".settings.thresholds.bgHigh")]
-    pub bg_high: f64,
+    pub bg_high: i32,
 
     #[query(".settings.thresholds.bgTargetTop")]
-    pub bg_target_top: f64,
+    pub bg_target_top: i32,
 
     #[query(".settings.thresholds.bgTargetBottom")]
-    pub bg_target_bottom: f64,
+    pub bg_target_bottom: i32,
 
     #[query(".settings.thresholds.bgLow")]
-    pub bg_low: f64,
+    pub bg_low: i32,
 }
 
 /// Pebble endpoint fields (cob, iob, bgdelta etc.)

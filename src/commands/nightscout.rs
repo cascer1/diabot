@@ -1,6 +1,5 @@
 use crate::serenity::CreateEmbed;
 use crate::util::colors::{ERROR, INFO};
-use crate::util::nightscout::v2_models::NightscoutV2Properties;
 use crate::util::nightscout::client::NightscoutClient;
 use crate::{Context, Error};
 use chrono::Utc;
@@ -87,8 +86,7 @@ pub fn build_response(avatar_url: String, ns_data: &CombinedNightscout) -> Creat
 fn set_response_color(ns_data: &CombinedNightscout, mut embed: CreateEmbed) -> CreateEmbed {
     let settings = &ns_data.status;
     let props = &ns_data.properties;
-    // casting to f64 is easier because all the settings come as f64s
-    let glucose = props.bgnow.last.as_mgdl_value() as f64;
+    let glucose = props.bgnow.last.as_mgdl_value();
     let bg_high = settings.bg_high;
     let bg_target_top = settings.bg_target_top;
     let bg_target_bottom = settings.bg_target_bottom;
