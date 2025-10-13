@@ -1,6 +1,6 @@
 use crate::conversions::glucose::Glucose;
 use serde::de::{Error, Visitor};
-use serde::{de, Deserializer};
+use serde::Deserializer;
 use std::fmt;
 use std::fmt::Formatter;
 
@@ -100,6 +100,8 @@ where
 }
 
 /// Custom deserializer for Glucose
+///
+/// Assumes floats are mmol/L and whole numbers are mg/dL
 pub fn deserialize_glucose<'de, D>(deserializer: D) -> Result<Glucose, D::Error>
 where
     D: Deserializer<'de>,
