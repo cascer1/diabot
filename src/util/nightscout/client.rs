@@ -1,9 +1,9 @@
-use crate::util::nightscout::v2_models::NightscoutV2Properties;
-use reqwest::header::HeaderMap;
-use reqwest::Url;
-use thiserror::Error;
-use tracing::{debug, info};
 use crate::util::nightscout::v1_models::{CombinedNightscout, Status};
+use crate::util::nightscout::v2_models::NightscoutV2Properties;
+use reqwest::Url;
+use reqwest::header::HeaderMap;
+use thiserror::Error;
+use tracing::{debug, error, info, trace};
 
 pub type Result<T> = std::result::Result<T, NsError>;
 
@@ -69,39 +69,69 @@ impl NightscoutClient {
 
     async fn handle_unexpected(resp: reqwest::Response) -> Result<NsError> {
         let status = resp.status();
+        let url = resp.url().clone();
         let text = resp.text().await.unwrap_or_default();
-        Ok(NsError::Other(format!("Unexpected HTTP {}: {}", status, text)))
+        let snippet = if text.len() > 500 {
+            format!("{}…", &text[..500])
+        } else {
+            text.clone()
+        };
+        error!(
+            http_status = %status,
+            url = %url,
+            body_len = text.len(),
+            body_snippet = %snippet,
+            "Unexpected HTTP response from Nightscout"
+        );
+        Ok(NsError::Other(format!(
+            "Unexpected HTTP {} from {}",
+            status, url
+        )))
+    }
+
+    async fn get_json<T: serde::de::DeserializeOwned>(&self, url: Url, label: &str) -> Result<T> {
+        debug!("Loading {} URL {}", label, url);
+        let resp = self.client.get(url.clone()).send().await?;
+        if resp.status().is_success() {
+            debug!("Got success response for {}", label);
+            let text = resp.text().await?;
+            match serde_json::from_str::<T>(&text) {
+                Ok(v) => Ok(v),
+                Err(e) => {
+                    let snippet = if text.len() > 500 {
+                        format!("{}…", &text[..500])
+                    } else {
+                        text.clone()
+                    };
+                    error!(url = %url, error = %e, label = %label, body_len = text.len(), body_snippet = %snippet, "Failed to decode JSON");
+                    Err(NsError::Other(format!(
+                        "Failed to decode {} JSON: {}",
+                        label, e
+                    )))
+                }
+            }
+        } else {
+            Err(Self::handle_unexpected(resp).await?)
+        }
     }
 
     /// GET /api/v2/properties/:comma_separated_list
     pub async fn get_v2_properties(&self, props: &[&str]) -> Result<NightscoutV2Properties> {
         let path = format!("properties/{}", props.join(","));
         let url = self.api_v2_path(&path)?;
-        info!("Loading URL {}", url);
-        let resp = self.client.get(url).send().await?;
-        if resp.status().is_success() {
-            info!("Got success response for properties");
-            Ok(resp.json::<NightscoutV2Properties>().await?)
-        } else {
-            Err(Self::handle_unexpected(resp).await?)
-        }
+        self.get_json::<NightscoutV2Properties>(url, "properties")
+            .await
     }
 
     /// GET /status
     pub async fn get_status(&self) -> Result<Status> {
         let url = self.api_v1_path("status.json")?;
-        info!("Loading URL {}", url);
-        let resp = self.client.get(url).send().await?;
-        if resp.status().is_success() {
-            info!("Got success response for status");
-            Ok(resp.json::<Status>().await?)
-        } else {
-            Err(Self::handle_unexpected(resp).await?)
-        }
+        self.get_json::<Status>(url, "status").await
     }
 
     /// Fetch status and properties concurrently and return a CombinedNightscout struct.
     pub async fn fetch_combined(&self) -> Result<CombinedNightscout> {
+        #[rustfmt::skip]
         let (status_res, props_res) = tokio::join!(
             self.get_status(),
             self.get_v2_properties(&[]),
@@ -110,10 +140,7 @@ impl NightscoutClient {
         let status = status_res?;
         let properties = props_res?;
 
-        Ok(CombinedNightscout {
-            status,
-            properties,
-        })
+        Ok(CombinedNightscout { status, properties })
     }
 }
 
@@ -121,7 +148,10 @@ pub fn parse_nightscout_url(input: &str) -> Result<(String, Option<String>)> {
     let mut url_str = input.to_string();
 
     if !url_str.starts_with("http://") && !url_str.starts_with("https://") {
-        debug!("Missing scheme in Nightscout URL: {}, adding https://", url_str);
+        debug!(
+            "Missing scheme in Nightscout URL: {}, adding https://",
+            url_str
+        );
         url_str = format!("https://{}", url_str);
     }
 
@@ -129,13 +159,15 @@ pub fn parse_nightscout_url(input: &str) -> Result<(String, Option<String>)> {
     let mut final_url = parsed.clone();
 
     // Extract and remove the token
-    let token = parsed.query_pairs()
+    let token = parsed
+        .query_pairs()
         .find(|(k, _)| k == "token")
         .map(|(_, v)| v.to_string());
 
-    final_url.query_pairs_mut().clear().extend_pairs(
-        parsed.query_pairs().filter(|(k, _)| k != "token")
-    );
+    final_url
+        .query_pairs_mut()
+        .clear()
+        .extend_pairs(parsed.query_pairs().filter(|(k, _)| k != "token"));
 
     debug!("Input (after token removal): {}", final_url);
 
@@ -149,7 +181,10 @@ pub fn parse_nightscout_url(input: &str) -> Result<(String, Option<String>)> {
     }
 
     if path_segments.ends_with(&["api", "v1"]) {
-        debug!("Removing API declaration in NS URL path: {:?}", path_segments);
+        debug!(
+            "Removing API declaration in NS URL path: {:?}",
+            path_segments
+        );
         path_segments.truncate(path_segments.len() - 2);
     }
 

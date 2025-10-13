@@ -5,7 +5,7 @@ use crate::{Context, Error};
 use chrono::Utc;
 use poise::serenity_prelude::{Color, CreateEmbedFooter, Timestamp};
 use poise::CreateReply;
-use tracing::{debug, warn};
+use tracing::error;
 use crate::util::nightscout::v1_models::CombinedNightscout;
 
 #[poise::command(
@@ -24,7 +24,7 @@ pub async fn nightscout(
     let author_avatar = ctx.author_member().await.map(|m| m.face()).unwrap_or(ctx.author().face());
     let ns_data = client.fetch_combined().await;
     if let Err(e) = &ns_data {
-        warn!("Error fetching data: {:?}", e);
+        error!("Error fetching data for URL {}: {:?}", url, e);
         let embed = CreateEmbed::default()
             .title("Error fetching data")
             .description("See follow-up response for more details")
