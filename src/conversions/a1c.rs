@@ -1,4 +1,4 @@
-use crate::conversions::a1c::EstimationError::{IntermediateCalulationError, MissingInputValue};
+use crate::conversions::a1c::EstimationError::MissingInputValue;
 use crate::conversions::glucose::Glucose;
 use thiserror::Error;
 
@@ -84,7 +84,10 @@ impl A1cEstimation {
         } else if self.glucose.is_some() {
             self.fructosamine = Some((self.calculate_dcct()?.dcct.unwrap() - 1.61) * 58.82)
         } else {
-            return Err(MissingInputValue("fructosamine".to_string(), "dcct, glucose".to_string()))
+            return Err(MissingInputValue(
+                "fructosamine".to_string(),
+                "dcct, glucose".to_string(),
+            ));
         }
 
         Ok(*self)
