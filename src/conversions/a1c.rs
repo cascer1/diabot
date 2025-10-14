@@ -1,6 +1,4 @@
-use crate::conversions::a1c::EstimationError::{
-    IntermediateCalulationError, MissingBloodGlucoseValue,
-};
+use crate::conversions::a1c::EstimationError::{IntermediateCalulationError, MissingInputValue};
 use crate::conversions::glucose::Glucose;
 use thiserror::Error;
 
@@ -14,24 +12,27 @@ struct A1cEstimation {
 
 #[derive(Debug, PartialEq, Error)]
 pub enum EstimationError {
-    #[error("Missing blood glucose value to estimate from")]
-    MissingBloodGlucoseValue,
-
-    #[error("Unable to calculate intermediate value for {0}")]
-    IntermediateCalulationError(String),
+    #[error("Unable to calculate {0}, expected input value(s): {1}")]
+    MissingInputValue(String, String),
 }
 
 impl A1cEstimation {
-    pub fn as_dcct(&mut self) -> Result<Self, EstimationError> {
+    fn calculate_dcct(&mut self) -> Result<Self, EstimationError> {
         if self.dcct.is_some() {
             return Ok(*self);
         }
 
-        if self.glucose.is_none() {
-            return Err(MissingBloodGlucoseValue);
+        if self.glucose.is_some() {
+            self.dcct = Some((self.glucose.unwrap().as_mgdl_value() as f32 + 46.7) / 28.7);
+        } else if self.ifcc.is_some() {
+            // dcct = (ifcc/10.929)+2.15
+            self.dcct = Some((self.ifcc.unwrap() / 10.929) + 2.15)
+        } else {
+            return Err(MissingInputValue(
+                String::from("dcct"),
+                String::from("glucose, ifcc"),
+            ));
         }
-
-        self.dcct = Some((self.glucose.unwrap().as_mgdl_value() as f32 + 46.7) / 28.7);
 
         Ok(*self)
     }
@@ -41,25 +42,24 @@ impl A1cEstimation {
             return Ok(self.dcct.unwrap());
         }
 
-        Ok(self.as_dcct()?.dcct.unwrap())
+        Ok(self.calculate_dcct()?.dcct.unwrap())
     }
 
-    pub fn as_ifcc(&mut self) -> Result<Self, EstimationError> {
+    fn calculate_ifcc(&mut self) -> Result<Self, EstimationError> {
         if self.ifcc.is_some() {
             return Ok(*self);
         }
 
-        if self.glucose.is_none() {
-            return Err(MissingBloodGlucoseValue);
+        if self.dcct.is_some() {
+            self.ifcc = Some((self.dcct.unwrap() - 2.15) * 10.929)
+        } else if self.glucose.is_some() {
+            self.ifcc = Some((self.calculate_dcct().unwrap().dcct.unwrap() - 2.15) * 10.929)
+        } else {
+            return Err(MissingInputValue(
+                "ifcc".to_string(),
+                "glucose, dcct".to_string(),
+            ));
         }
-
-        let temp_dcct = self.as_dcct()?.dcct;
-
-        if temp_dcct.is_none() {
-            return Err(IntermediateCalulationError(String::from("ifcc")));
-        }
-
-        self.ifcc = Some((temp_dcct.unwrap() - 2.15) * 10.929);
 
         Ok(*self)
     }
@@ -69,27 +69,23 @@ impl A1cEstimation {
             return Ok(self.ifcc.unwrap());
         }
 
-        Ok(self.as_ifcc()?.ifcc.unwrap())
+        Ok(self.calculate_ifcc()?.ifcc.unwrap())
     }
 
     // dcct = 0.017 * fructosamine + 1.61
     // fructosamine = (dcct - 1.61) * 58.82
-    pub fn as_fructosamine(&mut self) -> Result<Self, EstimationError> {
+    fn calculate_fructosamine(&mut self) -> Result<Self, EstimationError> {
         if self.fructosamine.is_some() {
             return Ok(*self);
         }
 
-        if self.glucose.is_none() {
-            return Err(MissingBloodGlucoseValue);
+        if self.dcct.is_some() {
+            self.fructosamine = Some((self.dcct.unwrap() - 1.61) * 58.82)
+        } else if self.glucose.is_some() {
+            self.fructosamine = Some((self.calculate_dcct()?.dcct.unwrap() - 1.61) * 58.82)
+        } else {
+            return Err(MissingInputValue("fructosamine".to_string(), "dcct, glucose".to_string()))
         }
-
-        let temp_dcct = self.as_dcct()?.dcct;
-
-        if temp_dcct.is_none() {
-            return Err(IntermediateCalulationError(String::from("fructosamine")));
-        }
-
-        self.fructosamine = Some((temp_dcct.unwrap() - 1.61) * 58.82);
 
         Ok(*self)
     }
@@ -99,7 +95,7 @@ impl A1cEstimation {
             return Ok(self.fructosamine.unwrap());
         }
 
-        Ok(self.as_fructosamine()?.fructosamine.unwrap())
+        Ok(self.calculate_fructosamine()?.fructosamine.unwrap())
     }
 }
 
@@ -190,6 +186,23 @@ mod test {
     }
 
     #[test]
+    fn test_dcct_to_ifcc() {
+        let dcct = 6.7;
+        let expected = 49.727;
+
+        let actual = A1cEstimation {
+            glucose: None,
+            ifcc: None,
+            dcct: Some(dcct),
+            fructosamine: None,
+        }
+        .as_ifcc_value()
+        .unwrap();
+
+        assert_approx_eq(expected, actual);
+    }
+
+    #[test]
     fn test_glucose_mgdl_to_fructosamine() {
         let glucose = Glucose::MgDl(100);
         let expected = 205.9586;
@@ -234,7 +247,7 @@ mod test {
             }
             .as_dcct_value()
             .unwrap_err(),
-            MissingBloodGlucoseValue
+            MissingInputValue("dcct".to_string(), "glucose, ifcc".to_string())
         );
     }
 
@@ -247,9 +260,9 @@ mod test {
                 dcct: None,
                 fructosamine: None,
             }
-                .as_ifcc_value()
-                .unwrap_err(),
-            MissingBloodGlucoseValue
+            .as_ifcc_value()
+            .unwrap_err(),
+            MissingInputValue("ifcc".to_string(), "glucose, dcct".to_string())
         );
     }
 
@@ -262,9 +275,9 @@ mod test {
                 dcct: None,
                 fructosamine: None,
             }
-                .as_fructosamine_value()
-                .unwrap_err(),
-            MissingBloodGlucoseValue
+            .as_fructosamine_value()
+            .unwrap_err(),
+            MissingInputValue("fructosamine".to_string(), "dcct, glucose".to_string())
         );
     }
 }
