@@ -10,17 +10,30 @@ pub type Result<T> = std::result::Result<T, NsError>;
 /// Error type for the wrapper.
 #[derive(Debug, Error)]
 pub enum NsError {
-    #[error("HTTP error: {0}")]
+    #[error("HTTP client error: {0}")]
     Http(#[from] reqwest::Error),
 
     #[error("Invalid URL: {0}")]
     Url(#[from] url::ParseError),
 
-    #[error("Invalid token: {0}")]
-    InvalidApiSecret(#[from] reqwest::header::InvalidHeaderValue),
+    #[error("Can't parse token: {0}")]
+    InvalidTokenParse(#[from] reqwest::header::InvalidHeaderValue),
 
-    #[error("Other error: {0}")]
-    Other(String),
+    #[error("Unauthorized on endpoint {endpoint}")]
+    Unauthorized { endpoint: String },
+
+    #[error("Unexpected HTTP {status} from {url}")]
+    HttpStatus {
+        status: reqwest::StatusCode,
+        url: Url,
+    },
+
+    #[error("Failed to decode {endpoint} JSON: {source}")]
+    Json {
+        endpoint: String,
+        #[source]
+        source: serde_json::Error,
+    },
 }
 
 /// A thin async client for interacting with a Nightscout instance's API.
@@ -67,26 +80,30 @@ impl NightscoutClient {
         Ok(joined)
     }
 
-    async fn handle_unexpected(resp: reqwest::Response) -> Result<NsError> {
+    async fn handle_unexpected(resp: reqwest::Response) -> NsError {
         let status = resp.status();
         let url = resp.url().clone();
         let text = resp.text().await.unwrap_or_default();
-        let snippet = if text.len() > 500 {
+        let body_len = text.len();
+        let snippet = if body_len > 500 {
             format!("{}…", &text[..500])
         } else {
-            text.clone()
+            text
         };
         error!(
             http_status = %status,
             url = %url,
-            body_len = text.len(),
+            body_len = body_len,
             body_snippet = %snippet,
             "Unexpected HTTP response from Nightscout"
         );
-        Ok(NsError::Other(format!(
-            "Unexpected HTTP {} from {}",
-            status, url
-        )))
+        if status == reqwest::StatusCode::UNAUTHORIZED {
+            NsError::Unauthorized {
+                endpoint: url.path().to_string(),
+            }
+        } else {
+            NsError::HttpStatus { status, url }
+        }
     }
 
     async fn get_json<T: serde::de::DeserializeOwned>(&self, url: Url, label: &str) -> Result<T> {
@@ -95,23 +112,18 @@ impl NightscoutClient {
         if resp.status().is_success() {
             debug!("Got success response for {}", label);
             let text = resp.text().await?;
-            match serde_json::from_str::<T>(&text) {
-                Ok(v) => Ok(v),
-                Err(e) => {
-                    let snippet = if text.len() > 500 {
-                        format!("{}…", &text[..500])
-                    } else {
-                        text.clone()
-                    };
-                    error!(url = %url, error = %e, label = %label, body_len = text.len(), body_snippet = %snippet, "Failed to decode JSON");
-                    Err(NsError::Other(format!(
-                        "Failed to decode {} JSON: {}",
-                        label, e
-                    )))
-                }
-            }
+            serde_json::from_str::<T>(&text).map_err(|e| {
+                let body_len = text.len();
+                let snippet = if body_len > 500 {
+                    format!("{}…", &text[..500])
+                } else {
+                    text
+                };
+                error!(url = %url, error = %e, label = %label, body_len = body_len, body_snippet = %snippet, "Failed to decode JSON");
+                NsError::Json { endpoint: label.to_string(), source: e }
+            })
         } else {
-            Err(Self::handle_unexpected(resp).await?)
+            Err(Self::handle_unexpected(resp).await)
         }
     }
 
