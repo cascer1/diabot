@@ -39,6 +39,22 @@ impl Glucose {
             Glucose::Mmol(_) => self.to_mgdl(),
         }
     }
+
+    /// Returns the glucose value in mg/dL, converting if needed.
+    pub fn as_mgdl_value(&self) -> i32 {
+        match self {
+            Glucose::MgDl(val) => *val,
+            Glucose::Mmol(val) => (*val * MGDL_PER_MMOL).round() as i32,
+        }
+    }
+
+    /// Returns the glucose value in mmol/L, converting if needed.
+    pub fn as_mmol_value(&self) -> f32 {
+        match self {
+            Glucose::MgDl(val) => *val as f32 / MGDL_PER_MMOL,
+            Glucose::Mmol(val) => *val,
+        }
+    }
 }
 
 impl fmt::Display for Glucose {
