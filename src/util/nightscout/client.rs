@@ -170,7 +170,7 @@ impl NightscoutClient {
         })
     }
 
-    /// GET /api/v2/properties/:comma_separated_list
+    /// GET `/api/v2/properties/:comma_separated_list`
     pub async fn get_v2_properties(&self, props: &[&str]) -> Result<NightscoutV2Properties> {
         let path = format!("properties/{}", props.join(","));
         let url = self.api_v2_path(&path)?;
@@ -207,7 +207,7 @@ pub fn parse_nightscout_url(input: &str) -> Result<(String, Option<String>)> {
             "Missing scheme in Nightscout URL: {}, adding https://",
             url_str
         );
-        url_str = format!("https://{}", url_str);
+        url_str = format!("https://{url_str}");
     }
 
     let parsed = Url::parse(&url_str)?;
@@ -229,7 +229,7 @@ pub fn parse_nightscout_url(input: &str) -> Result<(String, Option<String>)> {
     // Trim trailing empty segments
     let mut path_segments: Vec<&str> = parsed
         .path_segments()
-        .map_or(Vec::new(), |segments| segments.collect());
+        .map_or(Vec::new(), Iterator::collect);
 
     while path_segments.last() == Some(&"") {
         path_segments.pop();
