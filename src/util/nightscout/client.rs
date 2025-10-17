@@ -1,3 +1,4 @@
+use std::fmt;
 use crate::util::nightscout::v1_models::{CombinedNightscout, Status};
 use crate::util::nightscout::v2_models::NightscoutV2Properties;
 use reqwest::Url;
@@ -10,30 +11,72 @@ pub type Result<T> = std::result::Result<T, NsError>;
 /// Error type for the wrapper.
 #[derive(Debug, Error)]
 pub enum NsError {
-    #[error("HTTP client error: {0}")]
     Http(#[from] reqwest::Error),
 
-    #[error("Invalid URL: {0}")]
     Url(#[from] url::ParseError),
 
-    #[error("Can't parse token: {0}")]
     InvalidTokenParse(#[from] reqwest::header::InvalidHeaderValue),
 
-    #[error("Unauthorized on endpoint {endpoint}")]
     Unauthorized { endpoint: String },
 
-    #[error("Unexpected HTTP {status} from {url}")]
     HttpStatus {
         status: reqwest::StatusCode,
         url: Url,
     },
 
-    #[error("Failed to decode {endpoint} JSON: {source}")]
     Json {
         endpoint: String,
         #[source]
         source: serde_json::Error,
     },
+}
+
+impl NsError {
+    /// Returns true if the error message may include sensitive information, like a full URL.
+    ///
+    /// # Context
+    /// Some errors (like `reqwest::Error`) include the full request URL in their `Display` output.
+    /// We can't remove the URL because:
+    /// - `reqwest::Error::without_url()` requires a mutable reference
+    /// - `Display` only has access to `&self`
+    /// - `reqwest::Error` doesn't implement `Clone` or `Copy`
+    ///
+    /// This method helps callers decide whether the error can be shown publicly
+    /// or should be kept away from public view.
+    pub fn is_sensitive(&self) -> bool {
+        matches!(self, NsError::Http(_))
+    }
+}
+
+impl fmt::Display for NsError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            NsError::Http(err) => {
+                write!(f, "An internal error occurred while creating the request to the Nightscout instance: `{err}`\nPlease report this issue.")
+            }
+            NsError::Url(error) => {
+                write!(f, "The provided URL is invalid: {error}. Make sure it starts with `https://` and is a valid Nightscout instance.")
+            }
+            NsError::InvalidTokenParse(_) => {
+                write!(f, "The provided token could not be parsed.")
+            }
+            NsError::Unauthorized { endpoint } => {
+                write!(f, "Unauthorized when accessing `{endpoint}`. The instance may require an access token.")
+            }
+            NsError::HttpStatus { status, url } => {
+                let path = url.path();
+                match *status {
+                    reqwest::StatusCode::NOT_FOUND => write!(f, "The endpoint `{path}` was not found. This may not be a valid Nightscout instance."),
+                    reqwest::StatusCode::FORBIDDEN => write!(f, "Access to `{path}` is forbidden."),
+                    reqwest::StatusCode::BAD_REQUEST => write!(f, "Bad request sent to `{path}`."),
+                    _ => write!(f, "Received unexpected status code `{status}` from `{path}`."),
+                }
+            }
+            NsError::Json { endpoint, source } => {
+                write!(f, "Failed to parse the response from `{endpoint}`: `{source}`\nThis may be an issue in Diabot, please report this if you continue to see this message.")
+            }
+        }
+    }
 }
 
 /// A thin async client for interacting with a Nightscout instance's API.
