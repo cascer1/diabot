@@ -28,20 +28,28 @@ pub async fn nightscout(
         Ok(data) => data,
         Err(e) => {
             error!(%url, error = ?e, "Error fetching Nightscout data");
+            let embed = if e.is_sensitive() {
+                CreateEmbed::default()
+                    .title("Error fetching data")
+                    .description("See follow-up response for more details")
+                    .color(ERROR)
+            } else {
+                CreateEmbed::default()
+                    .title("Error fetching data")
+                    .description(e.to_string())
+                    .color(ERROR)
+            };
 
-            let embed = CreateEmbed::default()
-                .title("Error fetching data")
-                .description("See follow-up response for more details")
-                .color(ERROR);
-            let descriptive_embed = CreateEmbed::default()
-                .title("Error details")
-                .description(e.to_string())
-                .color(ERROR);
-
-            // non-ephemeral edit saying it failed to fetch data
             reply_handle.edit(ctx, CreateReply::default().embed(embed)).await?;
-            // ephemeral follow-up with the error details
-            ctx.send(CreateReply::default().embed(descriptive_embed).ephemeral(true)).await?;
+
+            if e.is_sensitive() {
+                let detailed_embed = CreateEmbed::default()
+                    .title("Error details")
+                    .description(e.to_string())
+                    .color(ERROR);
+
+                ctx.send(CreateReply::default().embed(detailed_embed).ephemeral(true)).await?;
+            }
             return Ok(());
         }
     };
