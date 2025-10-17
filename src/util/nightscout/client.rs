@@ -1,8 +1,8 @@
-use std::fmt;
 use crate::util::nightscout::v1_models::{CombinedNightscout, Status};
 use crate::util::nightscout::v2_models::NightscoutV2Properties;
 use reqwest::Url;
 use reqwest::header::HeaderMap;
+use std::fmt;
 use thiserror::Error;
 use tracing::{debug, error, info, trace};
 
@@ -17,7 +17,9 @@ pub enum NsError {
 
     InvalidTokenParse(#[from] reqwest::header::InvalidHeaderValue),
 
-    Unauthorized { endpoint: String },
+    Unauthorized {
+        endpoint: String,
+    },
 
     HttpStatus {
         status: reqwest::StatusCode,
@@ -52,28 +54,46 @@ impl fmt::Display for NsError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             NsError::Http(err) => {
-                write!(f, "An internal error occurred while creating the request to the Nightscout instance: `{err}`\nPlease report this issue.")
+                write!(
+                    f,
+                    "An internal error occurred while creating the request to the Nightscout instance: `{err}`\nPlease report this issue."
+                )
             }
             NsError::Url(error) => {
-                write!(f, "The provided URL is invalid: {error}. Make sure it starts with `https://` and is a valid Nightscout instance.")
+                write!(
+                    f,
+                    "The provided URL is invalid: {error}. Make sure it starts with `https://` and is a valid Nightscout instance."
+                )
             }
             NsError::InvalidTokenParse(_) => {
                 write!(f, "The provided token could not be parsed.")
             }
             NsError::Unauthorized { endpoint } => {
-                write!(f, "Unauthorized when accessing `{endpoint}`. The instance may require an access token.")
+                write!(
+                    f,
+                    "Unauthorized when accessing `{endpoint}`. The instance may require an access token."
+                )
             }
             NsError::HttpStatus { status, url } => {
                 let path = url.path();
                 match *status {
-                    reqwest::StatusCode::NOT_FOUND => write!(f, "The endpoint `{path}` was not found. This may not be a valid Nightscout instance."),
+                    reqwest::StatusCode::NOT_FOUND => write!(
+                        f,
+                        "The endpoint `{path}` was not found. This may not be a valid Nightscout instance."
+                    ),
                     reqwest::StatusCode::FORBIDDEN => write!(f, "Access to `{path}` is forbidden."),
                     reqwest::StatusCode::BAD_REQUEST => write!(f, "Bad request sent to `{path}`."),
-                    _ => write!(f, "Received unexpected status code `{status}` from `{path}`."),
+                    _ => write!(
+                        f,
+                        "Received unexpected status code `{status}` from `{path}`."
+                    ),
                 }
             }
             NsError::Json { endpoint, source } => {
-                write!(f, "Failed to parse the response from `{endpoint}`: `{source}`\nThis may be an issue in Diabot, please report this if you continue to see this message.")
+                write!(
+                    f,
+                    "Failed to parse the response from `{endpoint}`: `{source}`\nThis may be an issue in Diabot, please report this if you continue to see this message."
+                )
             }
         }
     }
@@ -226,9 +246,7 @@ pub fn parse_nightscout_url(input: &str) -> Result<(String, Option<String>)> {
     debug!("Input (after token removal): {}", final_url);
 
     // Trim trailing empty segments
-    let mut path_segments: Vec<&str> = parsed
-        .path_segments()
-        .map_or(Vec::new(), Iterator::collect);
+    let mut path_segments = parsed.path_segments().map_or(Vec::new(), Iterator::collect);
 
     while path_segments.last() == Some(&"") {
         path_segments.pop();

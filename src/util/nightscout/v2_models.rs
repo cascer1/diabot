@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
-use crate::util::deserializers::empty_object_is_none;
 use crate::conversions::glucose::Glucose;
+use crate::util::deserializers::empty_object_is_none;
 use crate::util::nightscout::types::TrendArrow;
 use serde::Deserialize;
 
@@ -119,11 +119,15 @@ mod tests {
     #[test]
     fn test_properties_1() {
         let json_data = include_str!("properties_1.json");
-        let props: NightscoutV2Properties = serde_json::from_str(json_data).expect("Failed to deserialize JSON");
+        let props: NightscoutV2Properties =
+            serde_json::from_str(json_data).expect("Failed to deserialize JSON");
 
         let bgnow = props.bgnow.as_ref().expect("Expected bgnow to be Some");
         let delta = props.delta.as_ref().expect("Expected delta to be Some");
-        let direction = props.direction.as_ref().expect("Expected direction to be Some");
+        let direction = props
+            .direction
+            .as_ref()
+            .expect("Expected direction to be Some");
 
         assert_eq!(bgnow.mean, Glucose::MgDl(252));
         assert_eq!(delta.mgdl, Glucose::MgDl(-6));
@@ -142,7 +146,8 @@ mod tests {
     #[test]
     fn test_properties_2() {
         let json_data = include_str!("properties_2.json");
-        let props: NightscoutV2Properties = serde_json::from_str(json_data).expect("Failed to deserialize JSON");
+        let props: NightscoutV2Properties =
+            serde_json::from_str(json_data).expect("Failed to deserialize JSON");
 
         let bgnow = props.bgnow.as_ref().expect("Expected bgnow to be Some");
         assert_eq!(bgnow.sgvs.len(), 1);
@@ -152,7 +157,8 @@ mod tests {
     #[test]
     fn test_properties_3() {
         let json_data = include_str!("properties_3.json");
-        let props: NightscoutV2Properties = serde_json::from_str(json_data).expect("Failed to deserialize JSON");
+        let props: NightscoutV2Properties =
+            serde_json::from_str(json_data).expect("Failed to deserialize JSON");
 
         let bgnow = props.bgnow.as_ref().expect("Expected bgnow to be Some");
         assert_eq!(bgnow.sgvs.len(), 1);
@@ -184,7 +190,8 @@ mod tests {
         }
         "#;
 
-        let plugin: BgNowPlugin = serde_json::from_str(json_data).expect("Failed to deserialize bgnow");
+        let plugin: BgNowPlugin =
+            serde_json::from_str(json_data).expect("Failed to deserialize bgnow");
 
         assert_eq!(plugin.mean, Glucose::MgDl(252));
         assert_eq!(plugin.last, Glucose::MgDl(252));
@@ -235,7 +242,8 @@ mod tests {
         }
         "#;
 
-        let plugin: DeltaPlugin = serde_json::from_str(json_data).expect("Failed to deserialize delta");
+        let plugin: DeltaPlugin =
+            serde_json::from_str(json_data).expect("Failed to deserialize delta");
 
         assert_eq!(plugin.absolute, Glucose::MgDl(-6));
         // unrounded floats my beloved
@@ -266,7 +274,8 @@ mod tests {
         }
         "#;
 
-        let plugin: DirectionPlugin = serde_json::from_str(json_data).expect("Failed to deserialize direction");
+        let plugin: DirectionPlugin =
+            serde_json::from_str(json_data).expect("Failed to deserialize direction");
 
         assert_eq!(plugin.value, "Flat");
         assert_eq!(plugin.label, "→");

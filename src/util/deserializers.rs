@@ -111,7 +111,7 @@ where
     impl<'de> Visitor<'de> for GlucoseVisitor {
         type Value = Glucose;
 
-        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        fn expecting(&self, formatter: &mut Formatter) -> fmt::Result {
             formatter.write_str("a glucose value in mg/dL (i32), mmol/L (f32), or either (string)")
         }
 

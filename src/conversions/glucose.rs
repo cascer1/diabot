@@ -1,10 +1,10 @@
+use crate::util::deserializers::deserialize_glucose;
+use crate::util::math::round_to;
+use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::fmt;
 use std::str::FromStr;
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use crate::util::deserializers::deserialize_glucose;
-use crate::util::math::round_to;
 
 const MGDL_PER_MMOL: f32 = 18.015588;
 const MIN_BG_VALUE: f32 = -9999.0;
@@ -66,7 +66,7 @@ impl Glucose {
     pub fn as_numeric_string(&self) -> String {
         match self {
             Glucose::MgDl(val) => format!("{}", val),
-            Glucose::Mmol(val) => format!("{:.1}", val)
+            Glucose::Mmol(val) => format!("{:.1}", val),
         }
     }
 
@@ -75,7 +75,11 @@ impl Glucose {
     /// Example: `+8`, `-0.4`
     pub fn as_delta_string(&self) -> String {
         let is_positive = self.as_mgdl_value() >= 0;
-        format!("{}{}", if is_positive { "+" } else { "" }, self.as_numeric_string())
+        format!(
+            "{}{}",
+            if is_positive { "+" } else { "" },
+            self.as_numeric_string()
+        )
     }
 }
 
@@ -93,9 +97,7 @@ impl PartialEq for Glucose {
         match (self, other) {
             // Compare values directly if both are in the same units
             (Glucose::MgDl(a), Glucose::MgDl(b)) => a == b,
-            (Glucose::Mmol(a), Glucose::Mmol(b)) => {
-                round_to(*a, 1) == round_to(*b, 1)
-            }
+            (Glucose::Mmol(a), Glucose::Mmol(b)) => round_to(*a, 1) == round_to(*b, 1),
             // If the units are different, convert them both to mg/dL and compare
             _ => self.as_mgdl_value() == other.as_mgdl_value(),
         }
@@ -404,7 +406,6 @@ mod tests {
             assert_eq!(glucose.to_string(), "7.0 mmol/L");
         }
 
-
         #[test]
         fn test_mgdl_equality() {
             let a = Glucose::MgDl(100);
@@ -429,10 +430,10 @@ mod tests {
 
         #[test]
         fn test_mgdl_vs_mmol_comparison() {
-            let a = Glucose::MgDl(99);           // 99 mg/dL
-            let b = Glucose::Mmol(5.5);          // 5.5 mmol/L ≈ 99.0 mg/dL
-            let c = Glucose::Mmol(5.6);          // ≈ 100.8 mg/dL
-            let d = Glucose::MgDl(100);          // 100 mg/dL
+            let a = Glucose::MgDl(99); // 99 mg/dL
+            let b = Glucose::Mmol(5.5); // 5.5 mmol/L ≈ 99.0 mg/dL
+            let c = Glucose::Mmol(5.6); // ≈ 100.8 mg/dL
+            let d = Glucose::MgDl(100); // 100 mg/dL
 
             assert_eq!(a, b);
             assert!(a < c);

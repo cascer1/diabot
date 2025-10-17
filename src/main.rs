@@ -24,7 +24,7 @@ async fn main() {
         .options(poise::FrameworkOptions {
             commands: vec![
                 commands::convert::convert(),
-                commands::nightscout::nightscout()
+                commands::nightscout::nightscout(),
                 // Add commands here
             ],
             on_error: |error| Box::pin(on_error(error)),

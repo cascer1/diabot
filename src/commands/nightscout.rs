@@ -1,14 +1,14 @@
 use crate::serenity::CreateEmbed;
 use crate::util::colors::{ERROR, INFO, WARNING};
 use crate::util::nightscout::client::NightscoutClient;
-use crate::{Context, Error};
-use chrono::Utc;
-use poise::serenity_prelude::{Color, CreateEmbedFooter, Timestamp};
-use poise::CreateReply;
-use tracing::{error, warn};
 use crate::util::nightscout::v1_models;
 use crate::util::nightscout::v1_models::CombinedNightscout;
 use crate::util::nightscout::v2_models::BgNowPlugin;
+use crate::{Context, Error};
+use chrono::Utc;
+use poise::CreateReply;
+use poise::serenity_prelude::{Color, CreateEmbedFooter, Timestamp};
+use tracing::{error, warn};
 
 #[poise::command(
     slash_command,
@@ -20,10 +20,16 @@ pub async fn nightscout(
 ) -> Result<(), Error> {
     let client = NightscoutClient::new_unauthed(&url)?;
 
-    let embed = CreateEmbed::default().description("*Fetching data...*").color(INFO);
+    let embed = CreateEmbed::default()
+        .description("*Fetching data...*")
+        .color(INFO);
     let reply_handle = ctx.send(CreateReply::default().embed(embed)).await?;
 
-    let author_avatar = ctx.author_member().await.map(|m| m.face()).unwrap_or(ctx.author().face());
+    let author_avatar = ctx
+        .author_member()
+        .await
+        .map(|m| m.face())
+        .unwrap_or(ctx.author().face());
     let ns_data = match client.fetch_combined().await {
         Ok(data) => data,
         Err(e) => {
@@ -40,7 +46,9 @@ pub async fn nightscout(
                     .color(ERROR)
             };
 
-            reply_handle.edit(ctx, CreateReply::default().embed(embed)).await?;
+            reply_handle
+                .edit(ctx, CreateReply::default().embed(embed))
+                .await?;
 
             if e.is_sensitive() {
                 let detailed_embed = CreateEmbed::default()
@@ -48,7 +56,8 @@ pub async fn nightscout(
                     .description(e.to_string())
                     .color(ERROR);
 
-                ctx.send(CreateReply::default().embed(detailed_embed).ephemeral(true)).await?;
+                ctx.send(CreateReply::default().embed(detailed_embed).ephemeral(true))
+                    .await?;
             }
             return Ok(());
         }
@@ -64,17 +73,24 @@ pub async fn nightscout(
                 .description(e)
                 .color(WARNING);
 
-            reply_handle.edit(ctx, CreateReply::default().embed(embed)).await?;
+            reply_handle
+                .edit(ctx, CreateReply::default().embed(embed))
+                .await?;
             return Ok(());
         }
     };
 
-    reply_handle.edit(ctx, CreateReply::default().embed(response_embed)).await?;
+    reply_handle
+        .edit(ctx, CreateReply::default().embed(response_embed))
+        .await?;
 
     Ok(())
 }
 
-pub fn build_response(avatar_url: String, ns_data: &CombinedNightscout) -> Result<CreateEmbed, String> {
+pub fn build_response(
+    avatar_url: String,
+    ns_data: &CombinedNightscout,
+) -> Result<CreateEmbed, String> {
     let settings = &ns_data.status;
     let props = &ns_data.properties;
 
@@ -94,7 +110,7 @@ pub fn build_response(avatar_url: String, ns_data: &CombinedNightscout) -> Resul
 
     let mut embed = CreateEmbed::default()
         .title(settings.custom_title.clone())
-        .field("mmol/L", mmol,true)
+        .field("mmol/L", mmol, true)
         .field("mg/dL", mgdl, true)
         .thumbnail(avatar_url);
 
@@ -116,13 +132,13 @@ pub fn build_response(avatar_url: String, ns_data: &CombinedNightscout) -> Resul
 
     embed = set_response_color(settings, bgnow, embed);
 
-    let timestamp = Timestamp::from_millis(bgnow.mills)
-        .map_err(|_| "Invalid timestamp from BG data")?;
-    embed = embed.timestamp(timestamp)
-        .footer(
-            CreateEmbedFooter::new("measured")
-                .icon_url("https://github.com/nightscout/cgm-remote-monitor/raw/master/static/images/large.png")
-        );
+    let timestamp =
+        Timestamp::from_millis(bgnow.mills).map_err(|_| "Invalid timestamp from BG data")?;
+    embed = embed
+        .timestamp(timestamp)
+        .footer(CreateEmbedFooter::new("measured").icon_url(
+            "https://github.com/nightscout/cgm-remote-monitor/raw/master/static/images/large.png",
+        ));
 
     let fifteen_min_ago = Utc::now() - chrono::Duration::minutes(15);
     if bgnow.mills < fifteen_min_ago.timestamp_millis() {
@@ -132,7 +148,11 @@ pub fn build_response(avatar_url: String, ns_data: &CombinedNightscout) -> Resul
     Ok(embed)
 }
 
-fn set_response_color(settings: &v1_models::Status, bgnow: &BgNowPlugin, embed: CreateEmbed) -> CreateEmbed {
+fn set_response_color(
+    settings: &v1_models::Status,
+    bgnow: &BgNowPlugin,
+    embed: CreateEmbed,
+) -> CreateEmbed {
     let glucose = bgnow.last.as_mgdl_value();
     let bg_high = settings.bg_high;
     let bg_target_top = settings.bg_target_top;
@@ -141,7 +161,9 @@ fn set_response_color(settings: &v1_models::Status, bgnow: &BgNowPlugin, embed: 
 
     let color = if glucose >= bg_high || glucose <= bg_low {
         Color::from_rgb(255, 0, 0) // red
-    } else if glucose >= bg_target_top && glucose < bg_high || glucose > bg_low && glucose <= bg_target_bottom {
+    } else if glucose >= bg_target_top && glucose < bg_high
+        || glucose > bg_low && glucose <= bg_target_bottom
+    {
         Color::from_rgb(255, 200, 0) // yellow
     } else {
         Color::from_rgb(0, 255, 0) // green

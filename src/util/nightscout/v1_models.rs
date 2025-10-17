@@ -1,24 +1,22 @@
 #![allow(dead_code)]
 
+use crate::conversions::glucose::GlucoseUnit;
 use crate::util::deserializers::deserialize_numstr;
+use crate::util::nightscout::types::TrendArrow;
+use crate::util::nightscout::v2_models::NightscoutV2Properties;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use serde_with::serde_as;
-use crate::conversions::glucose::GlucoseUnit;
-use crate::util::nightscout::types::TrendArrow;
-use crate::util::nightscout::v2_models::NightscoutV2Properties;
 
 /// Combined result struct containing everything fetched.
 #[derive(Debug, Deserialize)]
 pub struct CombinedNightscout {
     // Optional entries (most recent first if requested with count)
     // pub entries: Option<Vec<Entry>>,
-
     /// /status response
     pub status: Status,
 
     pub properties: NightscoutV2Properties,
-
     // Optional /pebble response
     // pub pebble: Option<Pebble>,
 }
@@ -101,7 +99,6 @@ pub struct PebbleBgEntry {
     pub bwpo: f32,
     pub cob: i32,
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -320,6 +317,5 @@ mod tests {
 
         let status: Status = serde_json::from_str(json).unwrap();
         println!("{:#?}", status);
-
     }
 }

@@ -2,7 +2,17 @@ use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumString, FromRepr, VariantNames};
 
 #[derive(
-    Debug, Clone, Copy, PartialEq, Eq, FromRepr, EnumString, VariantNames, Display, Serialize, Deserialize,
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    FromRepr,
+    EnumString,
+    VariantNames,
+    Display,
+    Serialize,
+    Deserialize,
 )]
 pub enum TrendArrow {
     #[serde(rename = "NONE")]
