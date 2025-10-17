@@ -184,16 +184,15 @@ impl NightscoutClient {
         self.get_json::<Status>(url, "status").await
     }
 
-    /// Fetch status and properties concurrently and return a CombinedNightscout struct.
+    /// Fetches status and properties concurrently and returns them as `CombinedNightscout`.
+    ///
+    /// Errors if any of the endpoints fail.
     pub async fn fetch_combined(&self) -> Result<CombinedNightscout> {
         #[rustfmt::skip]
-        let (status_res, props_res) = tokio::join!(
+        let (status, properties) = tokio::try_join!(
             self.get_status(),
             self.get_v2_properties(&[]),
-        );
-
-        let status = status_res?;
-        let properties = props_res?;
+        )?;
 
         Ok(CombinedNightscout { status, properties })
     }
