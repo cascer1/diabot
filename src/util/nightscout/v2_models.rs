@@ -27,22 +27,50 @@ pub struct Sgv {
     pub r#type: String, // should always be "sgv"
 }
 
+/// Represents the calculated difference (delta) between two BG readings,
+/// typically the most recent reading and the one preceding it.
+///
+/// This data is obtained from the `/api/v2/properties/delta` endpoint,
+/// and the calculations can be found [in the Nightscout source code.](https://github.com/nightscout/cgm-remote-monitor/blob/91cd601038a3bce00f92655cc6b1cc02fa3589d3/lib/plugins/bgnow.js#L147C1-L185C5)
 #[derive(Deserialize, Debug)]
 pub struct DeltaPlugin {
+    /// The absolute change in glucose between the recent and previous readings.
+    /// This is calculated as `recent.mean - previous.mean`.
+    /// Always in mg/dL.
     pub absolute: Glucose,
+
+    /// The number of minutes elapsed between the recent and previous data points.
+    /// This is calculated as `(recent.mills - previous.mills) / 60000`.
     #[serde(rename = "elapsedMins")]
     pub elapsed_mins: f64,
+
+    /// Whether the delta had to be interpolated due to a large time gap.
+    /// This is true when `elapsed_mins > 9`.
     pub interpolated: bool,
+
+    /// Estimated glucose value from 5 minutes ago.
+    /// If interpolated, it's estimated using the rate of change.
+    /// Otherwise, it's simply `recent.mean - delta.absolute`.
+    /// Always in mg/dL.
     #[serde(rename = "mean5MinsAgo")]
-    /// Mean glucose value for the last 5 minutes. Should be in mg/dL.
     pub mean_5m_ago: Glucose,
+
+    /// Timestamp information in milliseconds since epoch.
     pub times: DeltaTimes,
-    /// Glucose value in mg/dL
+
+    /// The change in glucose between the current reading and reading 5 minutes ago.
+    /// Computed as `recent.mean - mean_5m_ago`.
+    /// Always in mg/dL.
     pub mgdl: Glucose,
-    /// Scaled glucose value based on the Nightscout unit setting.
+
+    /// Delta value converted (scaled) using the measurement unit set in the Nightscout environment settings.
     pub scaled: Glucose,
-    /// Display version of `scaled`. The unit is based on Nightscout settings.
+
+    /// Display version of `scaled`. Includes a sign prefix ('+' or '-').
+    /// The unit is based on Nightscout settings.
     pub display: String,
+
+    /// Sanitized copy of the previous glucose data, excluding bucket-specific fields.
     pub previous: DeltaPrevious,
 }
 
