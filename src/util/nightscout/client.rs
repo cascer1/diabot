@@ -80,7 +80,7 @@ impl NightscoutClient {
         Ok(joined)
     }
 
-    async fn handle_unexpected(resp: reqwest::Response) -> NsError {
+    async fn status_error(resp: reqwest::Response) -> NsError {
         let status = resp.status();
         let url = resp.url().clone();
         let text = resp.text().await.unwrap_or_default();
@@ -109,22 +109,22 @@ impl NightscoutClient {
     async fn get_json<T: serde::de::DeserializeOwned>(&self, url: Url, label: &str) -> Result<T> {
         debug!("Loading {} URL {}", label, url);
         let resp = self.client.get(url.clone()).send().await?;
-        if resp.status().is_success() {
-            debug!("Got success response for {}", label);
-            let text = resp.text().await?;
-            serde_json::from_str::<T>(&text).map_err(|e| {
-                let body_len = text.len();
-                let snippet = if body_len > 500 {
-                    format!("{}…", &text[..500])
-                } else {
-                    text
-                };
-                error!(url = %url, error = %e, label = %label, body_len = body_len, body_snippet = %snippet, "Failed to decode JSON");
-                NsError::Json { endpoint: label.to_string(), source: e }
-            })
-        } else {
-            Err(Self::handle_unexpected(resp).await)
+        if resp.status().is_client_error() || resp.status().is_server_error() {
+            return Err(Self::status_error(resp).await);
         }
+
+        debug!("Got success response for {}", label);
+        let text = resp.text().await?;
+        serde_json::from_str::<T>(&text).map_err(|e| {
+            let len = text.len();
+            let snippet = if len > 500 {
+                format!("{}…", &text[..500])
+            } else {
+                text
+            };
+            error!(url = %url, error = %e, label = %label, body_len = len, body_snippet = %snippet, "Failed to decode JSON");
+            NsError::Json { endpoint: label.to_string(), source: e }
+        })
     }
 
     /// GET /api/v2/properties/:comma_separated_list
