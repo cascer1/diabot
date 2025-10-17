@@ -217,7 +217,7 @@ impl FromStr for ParsedGlucoseResult {
 ///
 /// The unit string in the result is always lowercased.
 /// This function only extracts the unit; it does not verify that it's valid.
-/// For validation, use [`ParsedGlucoseResult::parse_with_unit`].
+/// For validation, use [`ParsedGlucoseResult::parse`].
 ///
 /// If both the value string and the `unit` parameter specify a unit,
 /// the `unit` parameter takes precedence.
