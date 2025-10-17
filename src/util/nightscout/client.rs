@@ -114,12 +114,12 @@ impl NightscoutClient {
     }
 
     fn api_v1_path(&self, path: &str) -> Result<Url> {
-        let joined = self.base.join(&format!("/api/v1/{}", path))?;
+        let joined = self.base.join(&format!("api/v1/{path}"))?;
         Ok(joined)
     }
 
     fn api_v2_path(&self, path: &str) -> Result<Url> {
-        let joined = self.base.join(&format!("/api/v2/{}", path))?;
+        let joined = self.base.join(&format!("api/v2/{path}"))?;
         Ok(joined)
     }
 
