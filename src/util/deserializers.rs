@@ -1,6 +1,6 @@
 use crate::conversions::glucose::Glucose;
 use serde::de::{Error, Visitor};
-use serde::Deserializer;
+use serde::{Deserialize, Deserializer};
 use std::fmt;
 use std::fmt::Formatter;
 
@@ -167,4 +167,42 @@ where
     }
 
     deserializer.deserialize_any(GlucoseVisitor)
+}
+
+/// Deserializes empty JSON objects (`{}`) as `None`.
+///
+/// This helper is useful when APIs return empty objects instead of `null` for optional fields.
+/// If the input is an empty object, it returns `Ok(None)`. Otherwise, it attempts to deserialize
+/// the value into `T` and wraps it in `Some(...)`.
+///
+/// # Example
+/// ```
+/// use serde::Deserialize;
+///
+/// #[derive(Deserialize, Debug)]
+/// struct MyStruct {
+///     field: i32,
+/// }
+///
+/// #[derive(Deserialize, Debug)]
+/// struct Wrapper {
+///     #[serde(deserialize_with = "empty_object_is_none")]
+///     item: Option<MyStruct>,
+/// }
+///
+/// let data = r#"{ "item": {} }"#;
+/// let result: Wrapper = serde_json::from_str(data).unwrap();
+/// assert!(result.item.is_none());
+/// ```
+pub fn empty_object_is_none<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    let v = serde_json::Value::deserialize(deserializer)?;
+    if v.is_object() && v.as_object().unwrap().is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(T::deserialize(v).map_err(Error::custom)?))
+    }
 }
