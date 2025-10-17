@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use crate::util::deserializers::empty_object_is_none;
 use crate::conversions::glucose::Glucose;
 use crate::util::nightscout::types::TrendArrow;
 use serde::Deserialize;
@@ -23,7 +24,7 @@ pub struct Sgv {
     pub device: Option<String>,
     pub direction: TrendArrow,
     #[serde(rename = "type")]
-    pub r#type: String,  // should always be "sgv"
+    pub r#type: String, // should always be "sgv"
 }
 
 #[derive(Deserialize, Debug)]
@@ -95,10 +96,19 @@ pub struct CobPlugin {
 
 #[derive(Deserialize, Debug)]
 pub struct NightscoutV2Properties {
-    pub bgnow: BgNowPlugin,
-    pub delta: DeltaPlugin,
-    pub direction: DirectionPlugin,
+    #[serde(default, deserialize_with = "empty_object_is_none")]
+    pub bgnow: Option<BgNowPlugin>,
+
+    #[serde(default, deserialize_with = "empty_object_is_none")]
+    pub delta: Option<DeltaPlugin>,
+
+    #[serde(default, deserialize_with = "empty_object_is_none")]
+    pub direction: Option<DirectionPlugin>,
+
+    #[serde(default, deserialize_with = "empty_object_is_none")]
     pub iob: Option<IobPlugin>,
+
+    #[serde(default, deserialize_with = "empty_object_is_none")]
     pub cob: Option<CobPlugin>,
 }
 
@@ -107,30 +117,46 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_deserialize_nightscout_data() {
+    fn test_properties_1() {
         let json_data = include_str!("properties_1.json");
-        let parsed: NightscoutV2Properties = serde_json::from_str(json_data).expect("Failed to deserialize JSON");
+        let props: NightscoutV2Properties = serde_json::from_str(json_data).expect("Failed to deserialize JSON");
 
-        assert_eq!(parsed.bgnow.mean, Glucose::MgDl(252));
-        assert_eq!(parsed.delta.absolute, Glucose::MgDl(-6));
-        assert_eq!(parsed.direction.value, "Flat");
-        assert!(parsed.iob.is_some());
-        assert_eq!(parsed.iob.unwrap().iob, 4.198);
-        assert!(parsed.cob.is_some());
-        assert_eq!(parsed.cob.unwrap().cob, 0.0);
+        let bgnow = props.bgnow.as_ref().expect("Expected bgnow to be Some");
+        let delta = props.delta.as_ref().expect("Expected delta to be Some");
+        let direction = props.direction.as_ref().expect("Expected direction to be Some");
 
-        assert_eq!(parsed.bgnow.sgvs.len(), 1);
-        assert_eq!(parsed.bgnow.sgvs[0].mgdl, Glucose::MgDl(252));
+        assert_eq!(bgnow.mean, Glucose::MgDl(252));
+        assert_eq!(delta.mgdl, Glucose::MgDl(-6));
+        assert_eq!(direction.value, "Flat");
 
+        let iob = props.iob.as_ref().expect("Expected iob to be Some");
+        assert_eq!(iob.iob, 4.198);
+
+        let cob = props.cob.as_ref().expect("Expected cob to be Some");
+        assert_eq!(cob.cob, 0.0);
+
+        assert_eq!(bgnow.sgvs.len(), 1);
+        assert_eq!(bgnow.sgvs[0].mgdl, Glucose::MgDl(252));
+    }
+
+    #[test]
+    fn test_properties_2() {
         let json_data = include_str!("properties_2.json");
-        let parsed: NightscoutV2Properties = serde_json::from_str(json_data).expect("Failed to deserialize JSON");
-        assert_eq!(parsed.bgnow.sgvs.len(), 1);
-        assert_eq!(parsed.bgnow.sgvs[0].mgdl, Glucose::MgDl(293));
+        let props: NightscoutV2Properties = serde_json::from_str(json_data).expect("Failed to deserialize JSON");
 
+        let bgnow = props.bgnow.as_ref().expect("Expected bgnow to be Some");
+        assert_eq!(bgnow.sgvs.len(), 1);
+        assert_eq!(bgnow.sgvs[0].mgdl, Glucose::MgDl(293));
+    }
+
+    #[test]
+    fn test_properties_3() {
         let json_data = include_str!("properties_3.json");
-        let parsed: NightscoutV2Properties = serde_json::from_str(json_data).expect("Failed to deserialize JSON");
-        assert_eq!(parsed.bgnow.sgvs.len(), 1);
-        assert_eq!(parsed.bgnow.sgvs[0].mgdl, Glucose::MgDl(112));
+        let props: NightscoutV2Properties = serde_json::from_str(json_data).expect("Failed to deserialize JSON");
+
+        let bgnow = props.bgnow.as_ref().expect("Expected bgnow to be Some");
+        assert_eq!(bgnow.sgvs.len(), 1);
+        assert_eq!(bgnow.sgvs[0].mgdl, Glucose::MgDl(112));
     }
 
     #[test]
@@ -158,14 +184,14 @@ mod tests {
         }
         "#;
 
-        let parsed: BgNowPlugin = serde_json::from_str(json_data).expect("Failed to deserialize bgnow");
+        let plugin: BgNowPlugin = serde_json::from_str(json_data).expect("Failed to deserialize bgnow");
 
-        assert_eq!(parsed.mean, Glucose::MgDl(252));
-        assert_eq!(parsed.last, Glucose::MgDl(252));
-        assert_eq!(parsed.mills, 1760297566932);
-        assert_eq!(parsed.sgvs.len(), 1);
+        assert_eq!(plugin.mean, Glucose::MgDl(252));
+        assert_eq!(plugin.last, Glucose::MgDl(252));
+        assert_eq!(plugin.mills, 1760297566932);
+        assert_eq!(plugin.sgvs.len(), 1);
 
-        let sgv = &parsed.sgvs[0];
+        let sgv = &plugin.sgvs[0];
         assert_eq!(sgv.mgdl, Glucose::MgDl(252));
         assert_eq!(sgv.device, Some("xDrip-DexcomG5".to_string()));
         assert_eq!(sgv.direction, TrendArrow::Flat);
@@ -209,18 +235,18 @@ mod tests {
         }
         "#;
 
-        let parsed: DeltaPlugin = serde_json::from_str(json_data).expect("Failed to deserialize delta");
+        let plugin: DeltaPlugin = serde_json::from_str(json_data).expect("Failed to deserialize delta");
 
-        assert_eq!(parsed.absolute, Glucose::MgDl(-6));
+        assert_eq!(plugin.absolute, Glucose::MgDl(-6));
         // unrounded floats my beloved
-        assert_eq!(parsed.elapsed_mins, 4.999616666666666);
-        assert_eq!(parsed.mgdl, Glucose::MgDl(-6));
-        assert_eq!(parsed.scaled, Glucose::Mmol(-0.3));
-        assert_eq!(parsed.display, "-0.3");
-        assert_eq!(parsed.times.recent, 1760297566932);
-        assert_eq!(parsed.times.previous, 1760297266955);
+        assert_eq!(plugin.elapsed_mins, 4.999616666666666);
+        assert_eq!(plugin.mgdl, Glucose::MgDl(-6));
+        assert_eq!(plugin.scaled, Glucose::Mmol(-0.3));
+        assert_eq!(plugin.display, "-0.3");
+        assert_eq!(plugin.times.recent, 1760297566932);
+        assert_eq!(plugin.times.previous, 1760297266955);
 
-        let previous = &parsed.previous;
+        let previous = &plugin.previous;
         assert_eq!(previous.mean, Glucose::MgDl(258));
         assert_eq!(previous.sgvs.len(), 1);
 
@@ -228,7 +254,6 @@ mod tests {
         assert_eq!(sgv.mgdl, Glucose::MgDl(258));
         assert_eq!(sgv.device, Some("xDrip-DexcomG5".to_string()));
     }
-
 
     #[test]
     fn test_direction_deserialization() {
@@ -241,12 +266,12 @@ mod tests {
         }
         "#;
 
-        let parsed: DirectionPlugin = serde_json::from_str(json_data).expect("Failed to deserialize direction");
+        let plugin: DirectionPlugin = serde_json::from_str(json_data).expect("Failed to deserialize direction");
 
-        assert_eq!(parsed.value, "Flat");
-        assert_eq!(parsed.label, "→");
-        assert_eq!(parsed.entity, "&#8594;");
-        assert!(parsed.display.is_none());
+        assert_eq!(plugin.value, "Flat");
+        assert_eq!(plugin.label, "→");
+        assert_eq!(plugin.entity, "&#8594;");
+        assert!(plugin.display.is_none());
     }
 
     #[test]
@@ -265,17 +290,16 @@ mod tests {
         }
         "#;
 
-        let parsed: IobPlugin = serde_json::from_str(json_data).expect("Failed to deserialize iob");
+        let plugin: IobPlugin = serde_json::from_str(json_data).expect("Failed to deserialize iob");
 
-        assert_eq!(parsed.iob, 4.198);
-        assert_eq!(parsed.basaliob, 1.675);
-        assert_eq!(parsed.activity, 0.0454);
-        assert_eq!(parsed.source, "OpenAPS");
-        assert_eq!(parsed.device, "openaps://Redacted");
-        assert_eq!(parsed.display, "4.20");
-        assert_eq!(parsed.display_line, "IOB: 4.20U");
+        assert_eq!(plugin.iob, 4.198);
+        assert_eq!(plugin.basaliob, 1.675);
+        assert_eq!(plugin.activity, 0.0454);
+        assert_eq!(plugin.source, "OpenAPS");
+        assert_eq!(plugin.device, "openaps://Redacted");
+        assert_eq!(plugin.display, "4.20");
+        assert_eq!(plugin.display_line, "IOB: 4.20U");
     }
-
 
     #[test]
     fn test_cob_deserialization() {
@@ -290,13 +314,13 @@ mod tests {
         }
         "#;
 
-        let parsed: CobPlugin = serde_json::from_str(json_data).expect("Failed to deserialize cob");
+        let plugin: CobPlugin = serde_json::from_str(json_data).expect("Failed to deserialize cob");
 
-        assert_eq!(parsed.cob, 0.0);
-        assert_eq!(parsed.source, "OpenAPS");
-        assert_eq!(parsed.device, "openaps://Redacted");
-        assert_eq!(parsed.display, 0.0);
-        assert_eq!(parsed.display_line, "COB: 0g");
+        assert_eq!(plugin.cob, 0.0);
+        assert_eq!(plugin.source, "OpenAPS");
+        assert_eq!(plugin.device, "openaps://Redacted");
+        assert_eq!(plugin.display, 0.0);
+        assert_eq!(plugin.display_line, "COB: 0g");
     }
 
     #[test]
