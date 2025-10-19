@@ -187,7 +187,8 @@ pub struct IobPlugin {
     /// Portion of [`IobPlugin::iob`] attributed to basal insulin, in units.
     ///
     /// Only present if the source is OpenAPS.
-    pub basaliob: Option<f64>,
+    #[serde(rename = "basaliob")]
+    pub basal_iob: Option<f64>,
 
     /// Insulin activity level.
     ///
@@ -470,7 +471,7 @@ mod tests {
         let plugin: IobPlugin = serde_json::from_str(json_data).expect("Failed to deserialize iob");
 
         assert_eq!(plugin.iob, 4.198);
-        assert_eq!(plugin.basaliob, Some(1.675));
+        assert_eq!(plugin.basal_iob, Some(1.675));
         assert_eq!(plugin.activity, Some(0.0454));
         assert_eq!(plugin.source, Some("OpenAPS".into()));
         assert_eq!(plugin.device, Some("openaps://Redacted".into()));
