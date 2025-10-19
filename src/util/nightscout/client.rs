@@ -4,7 +4,7 @@ use reqwest::Url;
 use reqwest::header::HeaderMap;
 use std::fmt;
 use thiserror::Error;
-use tracing::{debug, error, info, trace};
+use tracing::{debug, error};
 
 pub type Result<T> = std::result::Result<T, NsError>;
 
