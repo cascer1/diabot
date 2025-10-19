@@ -112,7 +112,7 @@ impl NightscoutClient {
     /// The base URL should not include `/api/v1` or other paths.
     ///
     /// # Arguments
-    /// - `base` - The base URL ("https://my-nightscout.fly.dev")
+    /// - `base` - The base URL (`"https://my-nightscout.fly.dev"`)
     /// - `auth` - An optional api secret (not recommended) or token
     pub fn new(base: &str, auth: Option<&str>) -> Result<Self> {
         let base = Url::parse(base.trim_end_matches('/'))?;
