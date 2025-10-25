@@ -154,7 +154,7 @@ fn set_response_color(
     bgnow: &BgNowPlugin,
     embed: CreateEmbed,
 ) -> CreateEmbed {
-    let color = match bgnow.last.get_status(&settings.thresholds) {
+    let color = match bgnow.last.status(&settings.thresholds) {
         GlucoseStatus::Urgent => Color::from_rgb(255, 0, 0), // red
         GlucoseStatus::Outside => Color::from_rgb(255, 200, 0), // yellow
         GlucoseStatus::Inside => Color::from_rgb(0, 255, 0), // green
