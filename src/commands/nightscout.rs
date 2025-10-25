@@ -161,9 +161,7 @@ fn set_response_color(
 
     let color = if glucose >= bg_high || glucose <= bg_low {
         Color::from_rgb(255, 0, 0) // red
-    } else if glucose >= bg_target_top && glucose < bg_high
-        || glucose > bg_low && glucose <= bg_target_bottom
-    {
+    } else if glucose >= bg_target_top || glucose <= bg_target_bottom {
         Color::from_rgb(255, 200, 0) // yellow
     } else {
         Color::from_rgb(0, 255, 0) // green
