@@ -1,0 +1,53 @@
+{
+  "bgnow": {
+    "mean": 112,
+    "last": 112,
+    "mills": 1760300604000,
+    "sgvs": [
+      {
+        "_id": "68ec0e517e50b62437e56776",
+        "mgdl": 112,
+        "mills": 1760300604000,
+        "device": "share2",
+        "direction": "Flat",
+        "type": "sgv",
+        "scaled": 112
+      }
+    ]
+  },
+  "delta": {
+    "absolute": 6,
+    "elapsedMins": 5,
+    "interpolated": false,
+    "mean5MinsAgo": 106,
+    "times": {
+      "recent": 1760300604000,
+      "previous": 1760300304000
+    },
+    "mgdl": 6,
+    "scaled": 6,
+    "display": "+6",
+    "previous": {
+      "mean": 106,
+      "last": 106,
+      "mills": 1760300304000,
+      "sgvs": [
+        {
+          "_id": "68ec0d257e50b62437e5676d",
+          "mgdl": 106,
+          "mills": 1760300304000,
+          "device": "share2",
+          "direction": "Flat",
+          "type": "sgv",
+          "scaled": 106
+        }
+      ]
+    }
+  },
+  "direction": {
+    "display": null,
+    "value": "Flat",
+    "label": "→",
+    "entity": "&#8594;"
+  }
+}

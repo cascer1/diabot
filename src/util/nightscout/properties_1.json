@@ -1,0 +1,80 @@
+{
+  "bgnow": {
+    "mean": 252,
+    "last": 252,
+    "mills": 1760297566932,
+    "sgvs": [
+      {
+        "_id": "68ec0262bbbb6deacc785a3d",
+        "mgdl": 252,
+        "mills": 1760297566932,
+        "device": "xDrip-DexcomG5",
+        "direction": "Flat",
+        "filtered": 0,
+        "unfiltered": 0,
+        "noise": 1,
+        "rssi": 100,
+        "type": "sgv",
+        "scaled": "14.0"
+      }
+    ]
+  },
+  "delta": {
+    "absolute": -6,
+    "elapsedMins": 4.999616666666666,
+    "interpolated": false,
+    "mean5MinsAgo": 258,
+    "times": {
+      "recent": 1760297566932,
+      "previous": 1760297266955
+    },
+    "mgdl": -6,
+    "scaled": -0.3,
+    "display": "-0.3",
+    "previous": {
+      "mean": 258,
+      "last": 258,
+      "mills": 1760297266955,
+      "sgvs": [
+        {
+          "_id": "68ec0136bbbb6deacc785a3b",
+          "mgdl": 258,
+          "mills": 1760297266955,
+          "device": "xDrip-DexcomG5",
+          "direction": "Flat",
+          "filtered": 0,
+          "unfiltered": 0,
+          "noise": 1,
+          "rssi": 100,
+          "type": "sgv",
+          "scaled": "14.3"
+        }
+      ]
+    }
+  },
+  "direction": {
+    "display": null,
+    "value": "Flat",
+    "label": "→",
+    "entity": "&#8594;"
+  },
+  "iob": {
+    "iob": 4.198,
+    "basaliob": 1.675,
+    "activity": 0.0454,
+    "source": "OpenAPS",
+    "device": "openaps://Redacted",
+    "mills": 1760297604111,
+    "treatmentIob": 4.402,
+    "display": "4.20",
+    "displayLine": "IOB: 4.20U"
+  },
+  "cob": {
+    "cob": 0,
+    "source": "OpenAPS",
+    "device": "openaps://Redacted",
+    "mills": 1760297604111,
+    "display": 0,
+    "displayLine": "COB: 0g"
+  }
+}

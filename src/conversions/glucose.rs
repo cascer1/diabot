@@ -1,3 +1,8 @@
+use crate::util::deserializers::deserialize_glucose;
+use crate::util::math::round_to;
+use crate::util::nightscout::v1_models::GlucoseThreshold;
+use serde::{Deserialize, Serialize};
+use std::cmp::Ordering;
 use std::fmt;
 use std::str::FromStr;
 use thiserror::Error;
@@ -7,7 +12,7 @@ const MIN_BG_VALUE: f32 = -9999.0;
 const MAX_BG_VALUE: f32 = 9999.0;
 
 /// A glucose value and its unit of measurement.
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub enum Glucose {
     MgDl(i32),
     Mmol(f32),
@@ -23,12 +28,28 @@ impl Glucose {
         }
     }
 
+    /// Returns the glucose value in mg/dL, converting if needed.
+    pub fn as_mgdl_value(&self) -> i32 {
+        match self {
+            Glucose::MgDl(val) => *val,
+            Glucose::Mmol(val) => (*val * MGDL_PER_MMOL).round() as i32,
+        }
+    }
+
     /// Converts the value to mmol/L.
     /// If the value is already in mmol/L, it returns itself.
     pub fn to_mmol(self) -> Glucose {
         match self {
             Glucose::MgDl(val) => Glucose::Mmol(val as f32 / MGDL_PER_MMOL),
             Glucose::Mmol(_) => self,
+        }
+    }
+
+    /// Returns the glucose value in mmol/L, converting if needed.
+    pub fn as_mmol_value(&self) -> f32 {
+        match self {
+            Glucose::MgDl(val) => *val as f32 / MGDL_PER_MMOL,
+            Glucose::Mmol(val) => *val,
         }
     }
 
@@ -39,6 +60,33 @@ impl Glucose {
             Glucose::Mmol(_) => self.to_mgdl(),
         }
     }
+
+    /// Returns just the numeric part of the glucose value as a string.
+    ///
+    /// Useful for display purposes when the unit is implied or shown elsewhere.
+    pub fn as_numeric_string(&self) -> String {
+        match self {
+            Glucose::MgDl(val) => format!("{}", val),
+            Glucose::Mmol(val) => format!("{:.1}", val),
+        }
+    }
+
+    /// Returns the glucose value as a signed delta string, prefixed with "+" if positive.
+    ///
+    /// Example: `+8`, `-0.4`
+    pub fn as_delta_string(&self) -> String {
+        let is_positive = self.as_mgdl_value() >= 0;
+        format!(
+            "{}{}",
+            if is_positive { "+" } else { "" },
+            self.as_numeric_string()
+        )
+    }
+
+    /// Returns the glucose status based on the given threshold.
+    pub fn status(&self, threshold: &GlucoseThreshold) -> GlucoseStatus {
+        GlucoseStatus::new_status(self, threshold)
+    }
 }
 
 impl fmt::Display for Glucose {
@@ -46,6 +94,81 @@ impl fmt::Display for Glucose {
         match self {
             Glucose::MgDl(val) => write!(f, "{} mg/dL", val),
             Glucose::Mmol(val) => write!(f, "{:.1} mmol/L", val),
+        }
+    }
+}
+
+impl PartialEq for Glucose {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            // Compare values directly if both are in the same units
+            (Glucose::MgDl(a), Glucose::MgDl(b)) => a == b,
+            (Glucose::Mmol(a), Glucose::Mmol(b)) => round_to(*a, 1) == round_to(*b, 1),
+            // If the units are different, convert them both to mg/dL and compare
+            _ => self.as_mgdl_value() == other.as_mgdl_value(),
+        }
+    }
+}
+
+impl Eq for Glucose {}
+
+impl Ord for Glucose {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match (self, other) {
+            // Compare values directly if both are in the same units
+            (Glucose::MgDl(a), Glucose::MgDl(b)) => a.cmp(b),
+            (Glucose::Mmol(a), Glucose::Mmol(b)) => {
+                let a_rounded = round_to(*a, 1);
+                let b_rounded = round_to(*b, 1);
+                a_rounded.partial_cmp(&b_rounded).unwrap_or(Ordering::Equal)
+            }
+            // If the units are different, convert them both to mg/dL and compare
+            _ => self.as_mgdl_value().cmp(&other.as_mgdl_value()),
+        }
+    }
+}
+
+impl PartialOrd for Glucose {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<'de> Deserialize<'de> for Glucose {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserialize_glucose(deserializer)
+    }
+}
+
+/// Represents whether a glucose value is within the configured BG thresholds/ranges.
+#[derive(Debug, Clone, Copy)]
+pub enum GlucoseStatus {
+    /// Glucose is outside the low/high bounds.
+    Urgent,
+
+    /// Glucose is outside the target range but within the low/high bounds.
+    Outside,
+
+    /// Glucose is within the target range.
+    Inside,
+}
+
+impl GlucoseStatus {
+    /// Returns the glucose status based on the threshold ranges.
+    ///
+    /// * [`GlucoseStatus::Urgent`] if the glucose is below `bg_low` or above `bg_high`.
+    /// * [`GlucoseStatus::Outside`] if the glucose is outside the target range but within high/low bounds.
+    /// * [`GlucoseStatus::Inside`] if the glucose is within the target range.
+    pub fn new_status(glucose: &Glucose, threshold: &GlucoseThreshold) -> GlucoseStatus {
+        if *glucose >= threshold.bg_high || *glucose <= threshold.bg_low {
+            GlucoseStatus::Urgent
+        } else if *glucose >= threshold.bg_target_top || *glucose <= threshold.bg_target_bottom {
+            GlucoseStatus::Outside
+        } else {
+            GlucoseStatus::Inside
         }
     }
 }
@@ -130,7 +253,7 @@ impl FromStr for ParsedGlucoseResult {
 ///
 /// The unit string in the result is always lowercased.
 /// This function only extracts the unit; it does not verify that it's valid.
-/// For validation, use [`ParsedGlucoseResult::parse_with_unit`].
+/// For validation, use [`ParsedGlucoseResult::parse`].
 ///
 /// If both the value string and the `unit` parameter specify a unit,
 /// the `unit` parameter takes precedence.
@@ -318,6 +441,67 @@ mod tests {
             // Should include one decimal place
             assert_eq!(glucose.to_string(), "7.0 mmol/L");
         }
+
+        #[test]
+        fn test_mgdl_equality() {
+            let a = Glucose::MgDl(100);
+            let b = Glucose::MgDl(100);
+            let c = Glucose::MgDl(99);
+
+            assert_eq!(a, b);
+            assert_ne!(a, c);
+            assert!(c < a);
+        }
+
+        #[test]
+        fn test_mmol_equality_with_rounding() {
+            let a = Glucose::Mmol(5.52); // rounds to 5.5
+            let b = Glucose::Mmol(5.48); // rounds to 5.5
+            let c = Glucose::Mmol(5.44); // rounds to 5.4
+
+            assert_eq!(a, b);
+            assert_ne!(a, c);
+            assert!(c < a);
+        }
+
+        #[test]
+        fn test_mgdl_vs_mmol_comparison() {
+            let a = Glucose::MgDl(99); // 99 mg/dL
+            let b = Glucose::Mmol(5.5); // 5.5 mmol/L ≈ 99.0 mg/dL
+            let c = Glucose::Mmol(5.6); // ≈ 100.8 mg/dL
+            let d = Glucose::MgDl(100); // 100 mg/dL
+
+            assert_eq!(a, b);
+            assert!(a < c);
+            assert!(d < c); // 100 < 100.8
+        }
+
+        #[test]
+        fn test_ord_trait_sorting() {
+            let mut values = vec![
+                Glucose::MgDl(90),
+                Glucose::Mmol(5.0), // 90 mg/dL
+                Glucose::Mmol(5.1), // 91.8 mg/dL
+                Glucose::MgDl(100),
+            ];
+
+            values.sort();
+
+            assert_eq!(values[0], Glucose::MgDl(90));
+            assert_eq!(values[1], Glucose::Mmol(5.0));
+            assert_eq!(values[2], Glucose::Mmol(5.1));
+            assert_eq!(values[3], Glucose::MgDl(100));
+        }
+
+        #[test]
+        fn test_floating_point_precision() {
+            // Check values that are extremely close to rounding edge
+            let a = Glucose::Mmol(5.149); // rounds to 5.1
+            let b = Glucose::Mmol(5.151); // rounds to 5.2
+
+            assert_ne!(a, b);
+            assert!(a < b);
+        }
     }
 
     mod parsing {
@@ -467,4 +651,15 @@ mod tests {
             );
         }
     }
+}
+
+#[derive(Debug, Clone, poise::ChoiceParameter, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum GlucoseUnit {
+    #[name = "mg/dL"]
+    #[serde(alias = "mg/dl")]
+    Mgdl,
+    #[name = "mmol/L"]
+    #[serde(alias = "mmol/l")]
+    Mmol,
 }
