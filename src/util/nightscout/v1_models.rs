@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use crate::conversions::glucose::GlucoseUnit;
+use crate::conversions::glucose::{GlucoseThreshold, GlucoseUnit};
 use crate::util::deserializers::deserialize_numstr;
 use crate::util::nightscout::types::TrendArrow;
 use crate::util::nightscout::v2_models::NightscoutV2Properties;
@@ -54,18 +54,8 @@ pub struct Status {
     #[query(".settings.units")]
     pub units: GlucoseUnit,
 
-    // these should be in mg/dL
-    #[query(".settings.thresholds.bgHigh")]
-    pub bg_high: i32,
-
-    #[query(".settings.thresholds.bgTargetTop")]
-    pub bg_target_top: i32,
-
-    #[query(".settings.thresholds.bgTargetBottom")]
-    pub bg_target_bottom: i32,
-
-    #[query(".settings.thresholds.bgLow")]
-    pub bg_low: i32,
+    #[query(".settings.thresholds")]
+    pub thresholds: GlucoseThreshold,
 }
 
 /// Pebble endpoint fields (cob, iob, bgdelta etc.)

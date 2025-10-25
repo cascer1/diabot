@@ -1,3 +1,4 @@
+use crate::conversions::glucose::GlucoseStatus;
 use crate::serenity::CreateEmbed;
 use crate::util::colors::{ERROR, INFO, WARNING};
 use crate::util::nightscout::client::NightscoutClient;
@@ -153,18 +154,10 @@ fn set_response_color(
     bgnow: &BgNowPlugin,
     embed: CreateEmbed,
 ) -> CreateEmbed {
-    let glucose = bgnow.last.as_mgdl_value();
-    let bg_high = settings.bg_high;
-    let bg_target_top = settings.bg_target_top;
-    let bg_target_bottom = settings.bg_target_bottom;
-    let bg_low = settings.bg_low;
-
-    let color = if glucose >= bg_high || glucose <= bg_low {
-        Color::from_rgb(255, 0, 0) // red
-    } else if glucose >= bg_target_top || glucose <= bg_target_bottom {
-        Color::from_rgb(255, 200, 0) // yellow
-    } else {
-        Color::from_rgb(0, 255, 0) // green
+    let color = match bgnow.last.get_status(&settings.thresholds) {
+        GlucoseStatus::Urgent => Color::from_rgb(255, 0, 0), // red
+        GlucoseStatus::Outside => Color::from_rgb(255, 200, 0), // yellow
+        GlucoseStatus::Inside => Color::from_rgb(0, 255, 0), // green
     };
 
     embed.color(color)

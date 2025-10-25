@@ -81,6 +81,11 @@ impl Glucose {
             self.as_numeric_string()
         )
     }
+
+    /// Returns the glucose status based on the given threshold.
+    pub fn get_status(&self, threshold: &GlucoseThreshold) -> GlucoseStatus {
+        threshold.get_status(self)
+    }
 }
 
 impl fmt::Display for Glucose {
@@ -134,6 +139,54 @@ impl<'de> Deserialize<'de> for Glucose {
         D: serde::Deserializer<'de>,
     {
         deserialize_glucose(deserializer)
+    }
+}
+
+/// Represents whether a glucose value is within the configured BG thresholds/ranges.
+#[derive(Debug, Clone, Copy)]
+pub enum GlucoseStatus {
+    /// Glucose is outside the low/high bounds.
+    Urgent,
+
+    /// Glucose is outside the target range but within the low/high bounds.
+    Outside,
+
+    /// Glucose is within the target range.
+    Inside,
+}
+
+/// Glucose thresholds (high, target top, target bottom, low).
+///
+/// Matches the `thresholds` object from Nightscout API endpoint: `/api/v1/status.json`
+#[derive(Debug, Clone, Copy, Deserialize)]
+pub struct GlucoseThreshold {
+    #[serde(rename = "bgHigh")]
+    pub bg_high: Glucose,
+
+    #[serde(rename = "bgTargetTop")]
+    pub bg_target_top: Glucose,
+
+    #[serde(rename = "bgTargetBottom")]
+    pub bg_target_bottom: Glucose,
+
+    #[serde(rename = "bgLow")]
+    pub bg_low: Glucose,
+}
+
+impl GlucoseThreshold {
+    /// Returns the glucose status based on the threshold ranges.
+    ///
+    /// * [`GlucoseStatus::Urgent`] if the glucose is below `bg_low` or above `bg_high`.
+    /// * [`GlucoseStatus::Outside`] if the glucose is outside the target range but within high/low bounds.
+    /// * [`GlucoseStatus::Inside`] if the glucose is within the target range.
+    pub fn get_status(&self, glucose: &Glucose) -> GlucoseStatus {
+        if *glucose >= self.bg_high || *glucose <= self.bg_low {
+            GlucoseStatus::Urgent
+        } else if *glucose >= self.bg_target_top || *glucose <= self.bg_target_bottom {
+            GlucoseStatus::Outside
+        } else {
+            GlucoseStatus::Inside
+        }
     }
 }
 
