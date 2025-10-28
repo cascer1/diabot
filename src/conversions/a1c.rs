@@ -1,3 +1,4 @@
+use crate::commands::estimateUnit::EstimationUnit;
 use crate::conversions::a1c::EstimationError::MissingInputValue;
 use crate::conversions::glucose::Glucose;
 use thiserror::Error;
@@ -14,9 +15,24 @@ struct A1cEstimation {
 pub enum EstimationError {
     #[error("Unable to calculate {0}, expected input value(s): {1}")]
     MissingInputValue(String, String),
+    #[error("Impossible to estimate {0} using input {1}")]
+    ImpossibleConversion(EstimationUnit, EstimationUnit),
 }
 
 impl A1cEstimation {
+    pub fn estimate(
+        value: &str,
+        from: EstimationUnit,
+        to: EstimationUnit,
+    ) -> Result<A1cEstimation, EstimationError> {
+        if from == to {
+            return Err(EstimationError::ImpossibleConversion(from, to))
+        }
+
+        Ok(())
+        //todo: actually do the thing
+    }
+
     fn calculate_dcct(&mut self) -> Result<Self, EstimationError> {
         if self.dcct.is_some() {
             return Ok(*self);

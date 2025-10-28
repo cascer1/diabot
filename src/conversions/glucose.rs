@@ -1,3 +1,4 @@
+use crate::commands::glucoseUnit::GlucoseUnit;
 use std::fmt;
 use std::str::FromStr;
 use thiserror::Error;
@@ -49,6 +50,7 @@ impl Glucose {
     }
 
     /// Returns the glucose value in mmol/L, converting if needed.
+    #[expect(dead_code)]
     pub fn as_mmol_value(&self) -> f32 {
         match self {
             Glucose::MgDl(val) => *val as f32 / MGDL_PER_MMOL,
@@ -87,7 +89,8 @@ pub enum ParseGlucoseError {
     #[error("Invalid number format: '{0}'")]
     InvalidNumber(String),
 
-    #[error("Number is out of range: {0} (between {min} and {max})", min = MIN_BG_VALUE, max = MAX_BG_VALUE)]
+    #[error("Number is out of range: {0} (between {min} and {max})", min = MIN_BG_VALUE, max = MAX_BG_VALUE
+    )]
     OutOfRange(String),
 
     #[error("Unknown unit specified: '{0}'")]
@@ -106,29 +109,19 @@ impl ParsedGlucoseResult {
         }
         let num_int = num.round() as i32;
 
-        match parsed_unit.as_deref() {
-            None | Some("") => {
-                // Guess unit
-                if (25.0..=50.0).contains(&num) {
-                    Ok(Self::Ambiguous {
-                        original: s.trim().to_string(),
-                        as_mmol: Glucose::Mmol(num),
-                        as_mgdl: Glucose::MgDl(num_int),
-                    })
-                } else if num < 25.0 {
-                    Ok(Self::Known(Glucose::Mmol(num)))
-                } else {
-                    Ok(Self::Known(Glucose::MgDl(num_int)))
-                }
-            }
-
-            Some(unit) => {
-                // Unit provided
-                match unit.to_lowercase().as_str() {
-                    "mmol" | "mmol/l" => Ok(Self::Known(Glucose::Mmol(num))),
-                    "mg" | "mg/dl" | "mgdl" => Ok(Self::Known(Glucose::MgDl(num_int))),
-                    _ => Err(ParseGlucoseError::UnknownUnit(unit.to_string())),
-                }
+        match parsed_unit {
+            None => {
+                Ok(Self::Ambiguous {
+                    original: s.trim().to_string(),
+                    as_mmol: Glucose::Mmol(num),
+                    as_mgdl: Glucose::MgDl(num_int),
+                })
+            },
+            Some(GlucoseUnit::Mmol) => {
+                Ok(Self::Known(Glucose::Mmol(num)))
+            },
+            Some(GlucoseUnit::Mgdl) => {
+                Ok(Self::Known(Glucose::MgDl(num_int)))
             }
         }
     }
@@ -159,8 +152,8 @@ impl FromStr for ParsedGlucoseResult {
 /// - `("5.5", None)` - no unit provided
 pub fn parse_glucose_input(
     value: &str,
-    unit: Option<&str>,
-) -> Result<(f32, Option<String>), ParseGlucoseError> {
+    unit_input: Option<&str>,
+) -> Result<(f32, Option<GlucoseUnit>), ParseGlucoseError> {
     // Normalize commas (`5,5` -> `5.5`)
     let value = value.trim().replace(',', ".");
     if value.is_empty() {
@@ -187,12 +180,31 @@ pub fn parse_glucose_input(
         .parse()
         .map_err(|_| ParseGlucoseError::InvalidNumber(num_part.to_string()))?;
 
-    // Determine unit
-    let final_unit = match unit {
-        Some(u) => Some(u.trim().to_lowercase()), // unit parameter
-        None if !unit_part.is_empty() => Some(unit_part.to_lowercase()), // unit from value string
-        _ => None,
-    };
+    let intermediary_unit: &str;
+    let final_unit: Option<GlucoseUnit>;
+
+    if unit_input.is_some() {
+        intermediary_unit = unit_input.unwrap();
+    } else {
+        intermediary_unit = unit_part;
+    }
+
+    if !intermediary_unit.is_empty() {
+        // Determine unit
+        final_unit = match intermediary_unit.to_lowercase().as_str() {
+            "mmol" | "mmol/l" => Some(GlucoseUnit::Mmol),
+            "mg" | "mg/dl" | "mgdl" => Some(GlucoseUnit::Mgdl),
+            _ => return Err(ParseGlucoseError::UnknownUnit(unit_part.to_string())),
+        };
+    } else {
+        final_unit = if (25.0..=50.0).contains(&num) {
+            None
+        } else if num < 25.0 {
+            Some(GlucoseUnit::Mmol)
+        } else {
+            Some(GlucoseUnit::Mgdl)
+        }
+    }
 
     Ok((num, final_unit))
 }
@@ -418,7 +430,7 @@ mod tests {
             assert_eq!(err, ParseGlucoseError::UnknownUnit("mmoll".into()));
 
             let err = ParsedGlucoseResult::from_str("5.5 mmol / L ").unwrap_err();
-            assert_eq!(err, ParseGlucoseError::UnknownUnit("mmol / l".into()));
+            assert_eq!(err, ParseGlucoseError::UnknownUnit("mmol / L".into()));
         }
     }
 
@@ -428,26 +440,24 @@ mod tests {
         #[test]
         fn test_parse_glucose_input() {
             let cases = [
-                ("5.5 mmol", (5.5, Some("mmol"))),
-                ("5.5mmol/l", (5.5, Some("mmol/l"))),
-                ("5.5mmol/L", (5.5, Some("mmol/l"))),
-                ("5.5 mmol/L", (5.5, Some("mmol/l"))),
-                ("180mg/dl", (180.0, Some("mg/dl"))),
-                ("180 mg/dl", (180.0, Some("mg/dl"))),
-                ("180mgdl", (180.0, Some("mgdl"))),
-                ("180 mg", (180.0, Some("mg"))),
-                ("180 MG/DL", (180.0, Some("mg/dl"))),
-                ("180 randomunit", (180.0, Some("randomunit"))),
-                ("180 Random Unit", (180.0, Some("random unit"))),
-                ("5.5", (5.5, None)),
-                ("180", (180.0, None)),
+                ("5.5 mmol", (5.5, Some(GlucoseUnit::Mmol))),
+                ("5.5mmol/l", (5.5, Some(GlucoseUnit::Mmol))),
+                ("5.5mmol/L", (5.5, Some(GlucoseUnit::Mmol))),
+                ("5.5 mmol/L", (5.5, Some(GlucoseUnit::Mmol))),
+                ("180mg/dl", (180.0, Some(GlucoseUnit::Mgdl))),
+                ("180 mg/dl", (180.0, Some(GlucoseUnit::Mgdl))),
+                ("180mgdl", (180.0, Some(GlucoseUnit::Mgdl))),
+                ("180 mg", (180.0, Some(GlucoseUnit::Mgdl))),
+                ("180 MG/DL", (180.0, Some(GlucoseUnit::Mgdl))),
+                ("5.5", (5.5, Some(GlucoseUnit::Mmol))),
+                ("180", (180.0, Some(GlucoseUnit::Mgdl))),
             ];
 
             for (input, expected) in cases {
                 let parsed = parse_glucose_input(input, None).unwrap();
                 assert_eq!(
                     parsed,
-                    (expected.0, expected.1.map(|s| s.to_string())),
+                    (expected.0, expected.1),
                     "Failed on input: {}",
                     input
                 );
@@ -458,7 +468,7 @@ mod tests {
         fn test_parse_with_extra_spaces() {
             assert_eq!(
                 parse_glucose_input("  7.1   mmol/L ", None).unwrap(),
-                (7.1, Some("mmol/l".to_string()))
+                (7.1, Some(GlucoseUnit::Mmol))
             );
         }
 
